@@ -50,6 +50,19 @@ services:
       start_period: 60s
       retries: 20
 
+  # Private package index, a local stand-in for JFrog Artifactory.
+  # Started only on request: docker compose --profile packages up -d pypi
+  pypi:
+    image: pypiserver/pypiserver:v2.3.2
+    profiles: [packages]
+    command: run -P /data/htpasswd -a update /data/packages
+    ports:
+      - "127.0.0.1:${PYPI_PORT:-8081}:8080"
+    volumes:
+      - pypi_packages:/data/packages
+      - ./data/pypi/htpasswd:/data/htpasswd:ro
+
 volumes:
   pgdata:
   geoserver_data:
+  pypi_packages:

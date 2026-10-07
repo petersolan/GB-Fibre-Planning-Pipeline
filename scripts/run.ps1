@@ -38,6 +38,8 @@ $QgisPython = Get-ChildItem "C:\Program Files\QGIS *\bin\python-qgis*.bat" -Erro
 function Invoke-Step([string]$Name, [scriptblock]$Command) {
     Write-Host "==> $Name" -ForegroundColor Cyan
     $started = Get-Date
+    # Native tools (conda, docker) write warnings to stderr; judge them by exit code only
+    $ErrorActionPreference = "Continue"
     & $Command
     if ($LASTEXITCODE -ne 0) { throw "$Name failed (exit code $LASTEXITCODE)" }
     Write-Host ("    done in {0:N1} s" -f ((Get-Date) - $started).TotalSeconds) -ForegroundColor DarkGray
@@ -87,7 +89,7 @@ $tasks = @{
     publish  = {
         Invoke-Step "GeoServer publish" { Invoke-InEnv @("python", "-m", "fibre_planning.geoserver") }
         if ($QgisPython) {
-            Invoke-Step "QGIS project" { & $QgisPython.FullName qgis\build_project.py }
+            Invoke-Step "QGIS project" { & $QgisPython.FullName qgis_project\build_project.py }
         } else {
             Write-Warning "QGIS not found: skipped the QGIS project"
         }

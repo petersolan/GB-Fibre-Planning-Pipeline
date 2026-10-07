@@ -49,6 +49,7 @@ example_pipeline = "False"
 source_dir = "src"
 
 [tool.pytest.ini_options]
+testpaths = ["tests"]  # qgis_plugin/tests run inside QGIS Python
 addopts = "--cov-report term-missing --cov src/fibre_planning -ra"
 markers = ["integration: needs the PostGIS database (docker compose up -d postgis; kedro run)"]
 
@@ -87,6 +88,10 @@ ignore = [
 "tests/**" = ["PLR2004", "PLC0415"]
 # Command-line tool: printing is its output
 "src/fibre_planning/status.py" = ["T201"]
+"qgis_project/*.py" = ["T201"]
+# QGIS loads plugins through classFactory; importing the UI lazily keeps startup fast
+"qgis_plugin/fibre_planning_qgis/__init__.py" = ["PLC0415"]
+"qgis_plugin/tests/**" = ["PLR2004", "PLC0415"]
 
 [tool.mypy]
 python_version = "3.11"

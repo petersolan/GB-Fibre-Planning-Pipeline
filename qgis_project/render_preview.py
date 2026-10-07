@@ -1,6 +1,6 @@
-r"""Render qgis/fibre_planning.qgz to docs/images/qgis_exeter.png (PyQGIS, no GUI).
+r"""Render qgis_project/fibre_planning.qgz to docs/images/qgis_exeter.png (PyQGIS, no GUI).
 
-"C:\Program Files\QGIS 3.44.13\bin\python-qgis-ltr.bat" qgis\render_preview.py
+"C:\Program Files\QGIS 3.44.13\bin\python-qgis-ltr.bat" qgis_project\render_preview.py
 """
 
 import sys
@@ -19,7 +19,7 @@ def main() -> int:
     app = QgsApplication([], False)
     app.initQgis()
     project = QgsProject.instance()
-    project.read(str(ROOT / "qgis" / "fibre_planning.qgz"))
+    project.read(str(ROOT / "qgis_project" / "fibre_planning.qgz"))
     visible = [
         node.layer()
         for node in project.layerTreeRoot().findLayers()

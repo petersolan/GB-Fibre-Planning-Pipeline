@@ -1,7 +1,7 @@
-"""Build qgis/fibre_planning.qgz: the pipeline outputs ready to inspect in QGIS.
+r"""Build qgis_project/fibre_planning.qgz: the pipeline outputs ready to inspect in QGIS.
 
 Run with QGIS's Python (PyQGIS), e.g. on Windows:
-    "C:\\Program Files\\QGIS 3.44.13\\bin\\python-qgis-ltr.bat" qgis\\build_project.py
+    "C:\Program Files\QGIS 3.44.13\bin\python-qgis-ltr.bat" qgis_project\build_project.py
 
 The project holds no passwords. PostGIS layers connect through the PostgreSQL
 service "fibre" (see scripts/setup_pg_service.ps1, which writes your
@@ -25,7 +25,7 @@ from qgis.core import (
 
 ROOT = Path(__file__).resolve().parents[1]
 STYLES = ROOT / "geoserver" / "styles"
-OUT = ROOT / "qgis" / "fibre_planning.qgz"
+OUT = ROOT / "qgis_project" / "fibre_planning.qgz"
 SERVICE = "fibre"
 GEOSERVER_WMS = "http://127.0.0.1:8080/geoserver/fibre/wms"
 

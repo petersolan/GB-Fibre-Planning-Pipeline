@@ -32,4 +32,6 @@ dependencies:
   - ruff
   - mypy
   - pre-commit
+  # packaging
+  - twine
   - pip
