@@ -1,0 +1,34 @@
+name: fibre
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  # geospatial
+  - gdal
+  - geopandas
+  - pyogrio
+  - pyproj
+  - shapely
+  - pyarrow
+  # database
+  - sqlalchemy>=2
+  - geoalchemy2
+  - alembic
+  - psycopg
+  # pipeline
+  - kedro
+  - kedro-datasets
+  # service
+  - fastapi
+  - uvicorn
+  - pydantic-settings
+  - prometheus_client
+  - structlog
+  - httpx
+  # quality
+  - pytest
+  - pytest-cov
+  - ruff
+  - mypy
+  - pre-commit
+  - pip

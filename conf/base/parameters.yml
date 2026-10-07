@@ -1,0 +1,25 @@
+# Area to plan for: an ONS local authority district code
+area:
+  lad_code: E07000041   # Exeter
+
+boundary_api:
+  url: https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/LAD_MAY_2025_UK_BGC_V2/FeatureServer/0/query
+  code_field: LAD25CD
+  name_field: LAD25NM
+
+# Outputs of the GB-Census-Population-Map project (population per UPRN)
+census:
+  directory: ../Census-distribution/data/processed
+
+ofcom:
+  zip_path: data/01_raw/ofcom/ofcom_fixed_202601.zip
+  postcode_glob: fixed_pc_coverage_r2_
+
+roads:
+  zip_path: data/01_raw/os_open_roads/oproad_essh_gb.zip
+  buffer_m: 500          # also read roads just outside the boundary
+  columns: [identifier, function, name1]
+
+analysis:
+  max_drop_m: 150        # premises further than this from any road are left unassigned
+  min_people_to_rank: 1  # rank only road links serving at least this many people without gigabit

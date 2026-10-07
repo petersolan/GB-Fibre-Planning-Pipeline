@@ -1,0 +1,30 @@
+# Data is downloaded/generated locally, never committed
+data/
+
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Kedro
+logs/
+.telemetry
+
+# Editors
+.vscode/
+.idea/
+
+# Kedro: local config and credentials stay on this machine
+conf/local/**
+!conf/local/.gitkeep
+conf/**/*credentials*

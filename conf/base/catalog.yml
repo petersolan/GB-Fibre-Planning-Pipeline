@@ -1,0 +1,72 @@
+# Datasets not listed here are kept in memory between nodes.
+
+# --- ingest -------------------------------------------------------------
+boundary:
+  type: fibre_planning.datasets.vector_file.VectorFileDataset
+  filepath: data/02_intermediate/boundary.gpkg
+
+premises_valid:
+  type: geopandas.GenericDataset
+  filepath: data/02_intermediate/premises.parquet
+  file_format: parquet
+
+ofcom_coverage:
+  type: pandas.ParquetDataset
+  filepath: data/02_intermediate/ofcom_coverage.parquet
+
+road_links:
+  type: geopandas.GenericDataset
+  filepath: data/02_intermediate/road_links.parquet
+  file_format: parquet
+
+# --- analysis -----------------------------------------------------------
+premises:
+  type: geopandas.GenericDataset
+  filepath: data/03_primary/premises_coverage.parquet
+  file_format: parquet
+
+road_link_priority:
+  type: geopandas.GenericDataset
+  filepath: data/03_primary/road_link_priority.parquet
+  file_format: parquet
+
+postcode_coverage:
+  type: geopandas.GenericDataset
+  filepath: data/03_primary/postcode_coverage.parquet
+  file_format: parquet
+
+area_summary:
+  type: json.JSONDataset
+  filepath: data/08_reporting/area_summary.json
+
+# --- publish: PostGIS (schema owned by Alembic) ---------------------------
+db_area_boundary:
+  type: fibre_planning.datasets.postgis.PostGISDataset
+  table: area_boundary
+
+db_premises:
+  type: fibre_planning.datasets.postgis.PostGISDataset
+  table: premises
+
+db_postcode_coverage:
+  type: fibre_planning.datasets.postgis.PostGISDataset
+  table: postcode_coverage
+
+db_road_link_priority:
+  type: fibre_planning.datasets.postgis.PostGISDataset
+  table: road_link_priority
+
+# --- publish: files for QGIS and other tools ------------------------------
+road_priority_shp:
+  type: fibre_planning.datasets.vector_file.VectorFileDataset
+  filepath: data/07_model_output/road_priority.shp
+  driver: ESRI Shapefile
+
+road_priority_gpkg:
+  type: fibre_planning.datasets.vector_file.VectorFileDataset
+  filepath: data/07_model_output/fibre_planning.gpkg
+  layer: road_link_priority
+
+run_summary:
+  type: json.JSONDataset
+  filepath: data/08_reporting/run_summary.json
