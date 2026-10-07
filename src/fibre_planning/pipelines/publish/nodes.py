@@ -6,7 +6,7 @@ import logging
 from typing import Any
 
 import geopandas as gpd
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, insert
 
 from fibre_planning.db.config import get_settings
 from fibre_planning.db.models import PipelineRun
@@ -75,6 +75,6 @@ def record_run(summary: dict[str, Any], *_published: Any) -> dict[str, Any]:
     """
     engine = create_engine(get_settings().owner_url)
     with engine.begin() as conn:
-        conn.execute(PipelineRun.__table__.insert().values(lad_code=summary["lad_code"], summary=summary))
+        conn.execute(insert(PipelineRun).values(lad_code=summary["lad_code"], summary=summary))
     log.info("Run recorded: %s", summary)
     return summary

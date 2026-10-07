@@ -24,6 +24,7 @@ dependencies:
   - pydantic-settings
   - prometheus_client
   - structlog
+  - psutil
   - httpx
   # quality
   - pytest

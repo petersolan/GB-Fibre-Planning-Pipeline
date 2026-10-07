@@ -48,3 +48,8 @@ CONFIG_LOADER_ARGS = {
 # Class that manages the Data Catalog.
 # from kedro.io import DataCatalog
 # DATA_CATALOG_CLASS = DataCatalog
+
+# Per-node timings and row counts, logged and stored with each run
+from fibre_planning.hooks import PipelineMonitoringHooks  # noqa: E402
+
+HOOKS = (PipelineMonitoringHooks(),)

@@ -119,8 +119,10 @@ class GeoServer:
                 f"layer {table} update",
             )
         if style:
-            body = {"layer": {"defaultStyle": {"name": f"{WORKSPACE}:{style}"}}}
-            self._check(self.client.put(f"/layers/{WORKSPACE}:{table}", json=body), f"style for {table}")
+            style_body = {"layer": {"defaultStyle": {"name": f"{WORKSPACE}:{style}"}}}
+            self._check(
+                self.client.put(f"/layers/{WORKSPACE}:{table}", json=style_body), f"style for {table}"
+            )
 
 
 def publish() -> list[str]:

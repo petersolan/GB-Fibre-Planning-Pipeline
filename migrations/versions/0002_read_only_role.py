@@ -61,9 +61,11 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    role = _identifier(get_settings().api_db_user)
+    # Roles are cluster-wide but this migration runs per database: revoke what
+    # it granted here and leave the role, which other databases may still use
+    settings = get_settings()
+    role = _identifier(settings.api_db_user)
     op.execute(f"ALTER DEFAULT PRIVILEGES IN SCHEMA {SCHEMA} REVOKE SELECT ON TABLES FROM {role}")
     op.execute(f"REVOKE ALL ON ALL TABLES IN SCHEMA {SCHEMA} FROM {role}")
     op.execute(f"REVOKE USAGE ON SCHEMA {SCHEMA} FROM {role}")
-    op.execute(f"REVOKE CONNECT ON DATABASE {_identifier(get_settings().postgres_db)} FROM {role}")
-    op.execute(f"DROP ROLE IF EXISTS {role}")
+    op.execute(f"REVOKE CONNECT ON DATABASE {_identifier(settings.postgres_db)} FROM {role}")

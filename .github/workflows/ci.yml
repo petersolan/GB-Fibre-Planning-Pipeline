@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-file: environment.yml
+          cache-environment: true
+      - name: ruff
+        shell: bash -el {0}
+        run: |
+          ruff check src tests migrations
+          ruff format --check src tests migrations
+      - name: mypy
+        shell: bash -el {0}
+        run: mypy src
+
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgis:
+        image: postgis/postgis:17-3.5
+        env:
+          POSTGRES_DB: fibre
+          POSTGRES_USER: fibre_owner
+          POSTGRES_PASSWORD: ci-only-password
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U fibre_owner -d fibre"
+          --health-interval 5s --health-retries 20
+    env:
+      # Throwaway credentials for the CI service container only
+      POSTGRES_HOST: 127.0.0.1
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: fibre
+      POSTGRES_USER: fibre_owner
+      POSTGRES_PASSWORD: ci-only-password
+      API_DB_USER: fibre_reader
+      API_DB_PASSWORD: ci-only-reader
+      KEDRO_DISABLE_TELEMETRY: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-file: environment.yml
+          cache-environment: true
+      - name: Install package
+        shell: bash -el {0}
+        run: pip install --no-deps -e .
+      - name: Migrations (upgrade, downgrade, upgrade)
+        shell: bash -el {0}
+        run: |
+          alembic upgrade head
+          alembic downgrade base
+          alembic upgrade head
+      - name: Tests (unit + integration on a seeded test database)
+        shell: bash -el {0}
+        run: pytest -q --junitxml=reports/junit.xml --cov-report=xml:reports/coverage.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-reports
+          path: reports/
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build API image
+        run: docker build -t fibre-planning-api:${{ github.sha }} .
+      - name: Smoke test the image (starts, answers /health)
+        run: |
+          docker run -d --name api -p 8000:8000 \
+            -e POSTGRES_PASSWORD=x -e API_DB_PASSWORD=x fibre-planning-api:${{ github.sha }}
+          for i in $(seq 1 20); do curl -fs http://127.0.0.1:8000/health && exit 0; sleep 1; done
+          docker logs api; exit 1

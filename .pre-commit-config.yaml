@@ -1,0 +1,34 @@
+# pre-commit install   (then these run on every git commit)
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: [--unsafe]  # allows the !reference-style tags GitLab uses
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: detect-private-key
+      - id: check-merge-conflict
+  - repo: local
+    hooks:
+      # Use the conda env's ruff, so hooks, run.ps1 and CI share one version
+      - id: ruff
+        name: ruff check
+        entry: ruff check --fix
+        language: system
+        types: [python]
+        files: ^(src|tests|migrations)/
+      - id: ruff-format
+        name: ruff format
+        entry: ruff format
+        language: system
+        types: [python]
+        files: ^(src|tests|migrations)/
+      # Never commit the real .env (only .env.example)
+      - id: no-dotenv
+        name: block .env files
+        entry: .env files must not be committed (use .env.example)
+        language: fail
+        files: (^|/)\.env$

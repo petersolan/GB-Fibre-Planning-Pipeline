@@ -82,5 +82,19 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-# Tests compare against literal expected values
-"tests/**" = ["PLR2004"]
+# Tests compare against literal values, and import inside fixtures on purpose:
+# settings must point at the test database before the app is imported
+"tests/**" = ["PLR2004", "PLC0415"]
+# Command-line tool: printing is its output
+"src/fibre_planning/status.py" = ["T201"]
+
+[tool.mypy]
+python_version = "3.11"
+packages = ["fibre_planning"]
+mypy_path = "src"
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
+check_untyped_defs = true
+# Geospatial libraries ship without type stubs
+ignore_missing_imports = true

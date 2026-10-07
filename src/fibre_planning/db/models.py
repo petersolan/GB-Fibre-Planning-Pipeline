@@ -27,7 +27,7 @@ class AreaBoundary(Base):
 
     lad_code: Mapped[str] = mapped_column(String(9), primary_key=True)
     name: Mapped[str] = mapped_column(String(100))
-    geom = mapped_column(Geometry("MULTIPOLYGON", srid=SRID, spatial_index=False))
+    geom = mapped_column(Geometry("MULTIPOLYGON", srid=SRID, spatial_index=False), nullable=False)
 
 
 class Premises(Base):
@@ -44,7 +44,7 @@ class Premises(Base):
     people_no_gigabit: Mapped[float | None] = mapped_column(Float)
     road_link_id: Mapped[str | None] = mapped_column(String(38), index=True)
     drop_m: Mapped[float | None] = mapped_column(Float)
-    geom = mapped_column(Geometry("POINT", srid=SRID, spatial_index=False))
+    geom = mapped_column(Geometry("POINT", srid=SRID, spatial_index=False), nullable=False)
 
 
 class PostcodeCoverage(Base):
@@ -57,7 +57,7 @@ class PostcodeCoverage(Base):
     population: Mapped[int] = mapped_column(Integer)
     gigabit_pct: Mapped[float | None] = mapped_column(Float)
     people_no_gigabit: Mapped[float | None] = mapped_column(Float)
-    geom = mapped_column(Geometry("POINT", srid=SRID, spatial_index=False))
+    geom = mapped_column(Geometry("POINT", srid=SRID, spatial_index=False), nullable=False)
 
 
 class RoadLinkPriority(Base):
@@ -74,7 +74,7 @@ class RoadLinkPriority(Base):
     people_no_gigabit: Mapped[float] = mapped_column(Float)
     people_per_km: Mapped[float] = mapped_column(Float)
     priority_rank: Mapped[int | None] = mapped_column(Integer, index=True)
-    geom = mapped_column(Geometry("LINESTRING", srid=SRID, spatial_index=False))
+    geom = mapped_column(Geometry("LINESTRING", srid=SRID, spatial_index=False), nullable=False)
 
 
 class PipelineRun(Base):
