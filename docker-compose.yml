@@ -1,5 +1,6 @@
-# Local stack: PostGIS database and GeoServer.
-# Settings and passwords come from .env (copy .env.example).
+# Local stack: PostGIS, the API and GeoServer.
+# Settings and passwords come from .env (copy .env.example). All ports are
+# published on 127.0.0.1 only, so nothing is reachable from the network.
 services:
   postgis:
     image: postgis/postgis:17-3.5
@@ -8,7 +9,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"   # localhost only
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -16,5 +17,39 @@ services:
       interval: 5s
       retries: 20
 
+  api:
+    build: .
+    env_file: .env
+    environment:
+      # Inside the Compose network the database is "postgis" on its own port
+      POSTGRES_HOST: postgis
+      POSTGRES_PORT: 5432
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+    depends_on:
+      postgis:
+        condition: service_healthy
+
+  geoserver:
+    image: docker.osgeo.org/geoserver:2.28.5
+    environment:
+      GEOSERVER_ADMIN_USER: ${GEOSERVER_ADMIN_USER}
+      GEOSERVER_ADMIN_PASSWORD: ${GEOSERVER_ADMIN_PASSWORD}
+      SKIP_DEMO_DATA: "true"
+      CORS_ENABLED: "true"
+    ports:
+      - "127.0.0.1:${GEOSERVER_PORT:-8080}:8080"
+    volumes:
+      - geoserver_data:/opt/geoserver_data
+    depends_on:
+      postgis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:8080/geoserver/web/ > /dev/null || exit 1"]
+      interval: 15s
+      start_period: 60s
+      retries: 20
+
 volumes:
   pgdata:
+  geoserver_data:

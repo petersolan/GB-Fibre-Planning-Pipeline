@@ -8,8 +8,15 @@ address** (from the companion project
 Roads** network, then ranks road links by people without gigabit service per
 km of road.
 
-> Work in progress. Phase 1 (pipeline, PostGIS, migrations) is done; the API,
-> GeoServer, QGIS, CI and observability follow.
+> Work in progress. Done: pipeline, PostGIS and migrations; read-only API;
+> GeoServer and QGIS. Next: CI, PowerShell tooling, observability, a QGIS
+> plugin and packaging.
+
+![Exeter in QGIS: premises by gigabit coverage and road links by build priority](docs/images/qgis_exeter.png)
+
+*QGIS project (`qgis/fibre_planning.qgz`): premises green with gigabit, red
+without; road links from pale to dark red by people without gigabit per km.
+GeoServer serves the same layers with the same SLD styles.*
 
 ## First results: Exeter (January 2026 coverage)
 
@@ -36,6 +43,11 @@ A [Kedro](https://kedro.org) project with three pipelines:
 3. **publish**: loads PostGIS tables (schema owned by **Alembic** migrations,
    GiST spatial indexes, a read-only role for services), exports a Shapefile
    and a GeoPackage for QGIS, and records each run in `fibre.pipeline_run`.
+4. **serve**: a read-only **FastAPI** service (`/v1/...` GeoJSON endpoints,
+   `/health`, `/ready`, Prometheus `/metrics`), and **GeoServer**, configured
+   through its REST API, publishing the PostGIS tables as WMS/WFS layers with
+   SLD styles. The QGIS project connects through a PostgreSQL service name, so
+   it holds no passwords.
 
 ## Running it
 
@@ -46,8 +58,14 @@ copy .env.example .env          # then set passwords
 docker compose up -d postgis    # PostGIS on 127.0.0.1:5433
 alembic upgrade head            # create the schema and read-only role
 kedro run                       # about 30 s for Exeter
+docker compose up -d --build    # API on :8000, GeoServer on :8080
+python -m fibre_planning.geoserver   # publish layers and styles
+.\scripts\setup_pg_service.ps1  # pg_service.conf entry for QGIS
 pytest
 ```
+
+API docs: http://127.0.0.1:8000/docs. GeoServer: http://127.0.0.1:8080/geoserver.
+Open `qgis/fibre_planning.qgz` in QGIS 3.34+.
 
 Inputs go in `data/01_raw/` (not committed): Ofcom Connected Nations
 January 2026 fixed coverage zip and the OS Open Roads GB Shapefile zip. The
