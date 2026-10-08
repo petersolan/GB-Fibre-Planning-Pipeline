@@ -43,6 +43,33 @@ class RoadLink:
             f"{self.length_m:.0f} m ({self.people_per_km:.0f}/km)"
         )
 
+    @property
+    def lines(self) -> list[list[list[float]]]:
+        return [self.coordinates]
+
+
+@dataclass(frozen=True)
+class BuildStep:
+    """A gap street with its route from the existing gigabit network (pgRouting)."""
+
+    road_link_id: str
+    rank: int
+    name: str
+    people_no_gigabit: float
+    connect_m: float
+    total_m: float
+    est_cost_gbp: float
+    cost_per_premises_gbp: float
+    lines: list[list[list[float]]]  # WGS84 lon/lat: the street plus its connecting route
+
+    @property
+    def label(self) -> str:
+        reach = "on the network" if self.connect_m == 0 else f"+{self.connect_m:.0f} m to reach"
+        return (
+            f"#{self.rank}  {self.name}: {self.people_no_gigabit:.0f} people, {reach}, "
+            f"~£{self.est_cost_gbp:,.0f} (£{self.cost_per_premises_gbp:,.0f}/premises)"
+        )
+
 
 @dataclass(frozen=True)
 class Postcode:
@@ -82,6 +109,30 @@ def parse_road_links(collection: dict) -> list[RoadLink]:
     return links
 
 
+def parse_build_plan(collection: dict) -> list[BuildStep]:
+    steps = []
+    for feature in collection.get("features", []):
+        props = feature["properties"]
+        geometry = feature["geometry"]
+        lines = (
+            geometry["coordinates"] if geometry["type"] == "MultiLineString" else [geometry["coordinates"]]
+        )
+        steps.append(
+            BuildStep(
+                road_link_id=str(feature["id"]),
+                rank=int(props["build_rank"]),
+                name=props.get("road_name") or "Unnamed road",
+                people_no_gigabit=float(props["people_no_gigabit"]),
+                connect_m=float(props["connect_m"]),
+                total_m=float(props["total_m"]),
+                est_cost_gbp=float(props["est_cost_gbp"]),
+                cost_per_premises_gbp=float(props["cost_per_premises_gbp"]),
+                lines=lines,
+            )
+        )
+    return steps
+
+
 def normalise_postcode(text: str) -> str:
     """'ex44qj' -> 'EX4 4QJ'; raises ValueError if it can't be a UK postcode."""
     compact = re.sub(r"\s+", "", text.upper())
@@ -118,6 +169,9 @@ class FibreApi:
 
     def top_road_links(self, limit: int = 20) -> list[RoadLink]:
         return parse_road_links(self._get("/v1/road-links", limit=limit))
+
+    def build_plan(self, limit: int = 20) -> list[BuildStep]:
+        return parse_build_plan(self._get("/v1/build-plan", limit=limit))
 
     def postcode(self, text: str) -> Postcode:
         normalised = normalise_postcode(text)

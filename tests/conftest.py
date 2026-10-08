@@ -89,8 +89,11 @@ def seeded_database(test_database: str) -> str:
                 ST_SetSRID(ST_MakeLine(ST_MakePoint(291000, 92100), ST_MakePoint(291200, 92100)), 27700)),
                ('LINK-B', 'Local Road', 'Low Lane', 500, 2, 2, 5, 10, 1,
                 ST_SetSRID(ST_MakeLine(ST_MakePoint(291300, 92500), ST_MakePoint(291800, 92500)), 27700))""",
-            """INSERT INTO fibre.gap_connection VALUES
-               ('LINK-B', 'Low Lane', 5, 500, 100, 600, 8.33, 1,
+            """INSERT INTO fibre.gap_connection
+                 (road_link_id, road_name, people_no_gigabit, street_m, connect_m, total_m,
+                  people_per_km_total, build_rank, premises_no_gigabit, est_cost_gbp,
+                  cost_per_premises_gbp, geom)
+               VALUES ('LINK-B', 'Low Lane', 5, 500, 100, 600, 8.33, 1, 2, 60000, 30000,
                 ST_Multi(ST_SetSRID(ST_MakeLine(ST_MakePoint(291200, 92500), ST_MakePoint(291800, 92500)), 27700)))""",
             "INSERT INTO fibre.pipeline_run (lad_code, summary) VALUES (:lad, CAST(:summary AS jsonb))",
         ]

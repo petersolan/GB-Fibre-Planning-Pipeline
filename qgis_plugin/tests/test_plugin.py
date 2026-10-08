@@ -22,6 +22,7 @@ from fibre_planning_qgis.api_client import (  # noqa: E402
     ApiError,
     FibreApi,
     normalise_postcode,
+    parse_build_plan,
     parse_road_links,
 )
 
@@ -59,6 +60,33 @@ class ParsingTests(unittest.TestCase):
         self.assertEqual(link.rank, 1)
         self.assertEqual(link.name, "Local Road")  # falls back when the road has no name
         self.assertIn("5 people without gigabit", link.label)
+
+    def test_parse_build_plan(self):
+        collection = {
+            "features": [
+                {
+                    "type": "Feature",
+                    "id": "LINK-B",
+                    "geometry": {
+                        "type": "MultiLineString",
+                        "coordinates": [[[-3.53, 50.72], [-3.52, 50.72]], [[-3.52, 50.72], [-3.51, 50.72]]],
+                    },
+                    "properties": {
+                        "build_rank": 1,
+                        "road_name": "Low Lane",
+                        "people_no_gigabit": 5.0,
+                        "connect_m": 100.0,
+                        "total_m": 600.0,
+                        "est_cost_gbp": 60000.0,
+                        "cost_per_premises_gbp": 30000.0,
+                    },
+                }
+            ]
+        }
+        (step,) = parse_build_plan(collection)
+        self.assertEqual(len(step.lines), 2)  # street plus connecting route
+        self.assertIn("+100 m to reach", step.label)
+        self.assertIn("£60,000", step.label)
 
     def test_normalise_postcode(self):
         self.assertEqual(normalise_postcode(" ex44qj "), "EX4 4QJ")
@@ -100,12 +128,13 @@ class PanelTests(unittest.TestCase):
 
         panel = FibrePanel(Iface())
         panel.limit.setValue(10)
-        panel.load_links()
-        self.assertEqual(panel.list.count(), 10)
-
-        panel.zoom_to_link(panel.list.item(0))
-        extent = canvas.extent()
-        self.assertTrue(280_000 < extent.center().x() < 300_000, extent.toString())  # Exeter, BNG
+        for view in ("Build plan (with routes)", "Road links (street only)"):
+            panel.view.setCurrentText(view)
+            panel.load_links()
+            self.assertEqual(panel.list.count(), 10, view)
+            panel.zoom_to_link(panel.list.item(0))
+            extent = canvas.extent()
+            self.assertTrue(280_000 < extent.center().x() < 300_000, extent.toString())  # Exeter, BNG
 
         panel.postcode.setText("ex4 4qj")
         panel.lookup_postcode()

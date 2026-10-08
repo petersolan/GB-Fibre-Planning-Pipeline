@@ -15,6 +15,7 @@ from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtGui import QColor
 from qgis.PyQt.QtWidgets import (
     QAction,
+    QComboBox,
     QDockWidget,
     QHBoxLayout,
     QLabel,
@@ -30,6 +31,11 @@ from qgis.PyQt.QtWidgets import (
 from .api_client import DEFAULT_API_URL, ApiError, FibreApi
 
 SETTINGS_KEY = "fibre_planning/api_url"
+# view name -> (API path, label used for layers and messages)
+VIEWS = {
+    "Build plan (with routes)": ("/v1/build-plan", "build plan steps"),
+    "Road links (street only)": ("/v1/road-links", "road links"),
+}
 WGS84 = QgsCoordinateReferenceSystem("EPSG:4326")
 
 
@@ -48,9 +54,13 @@ class FibrePanel(QDockWidget):
         layout.addWidget(QLabel("API address"))
         layout.addWidget(self.api_url)
 
+        self.view = QComboBox()
+        self.view.addItems(list(VIEWS))
+        layout.addWidget(self.view)
+
         row = QHBoxLayout()
         self.limit = QSpinBox(minimum=5, maximum=200, value=20)
-        load = QPushButton("Top road links")
+        load = QPushButton("Load")
         load.clicked.connect(self.load_links)
         add_layer = QPushButton("Add as layer")
         add_layer.clicked.connect(self.add_links_layer)
@@ -88,8 +98,11 @@ class FibrePanel(QDockWidget):
         self.result.setText(f"<span style='color:#b00'>{error}</span>")
 
     def load_links(self) -> None:
+        build = self.view.currentText().startswith("Build")
         try:
-            self.links = self.api().top_road_links(self.limit.value())
+            api = self.api()
+            limit = self.limit.value()
+            self.links = api.build_plan(limit) if build else api.top_road_links(limit)
         except ApiError as error:
             self._show_error(error)
             return
@@ -98,11 +111,14 @@ class FibrePanel(QDockWidget):
             item = QListWidgetItem(link.label)
             item.setData(Qt.ItemDataRole.UserRole, link)
             self.list.addItem(item)
-        self.result.setText(f"{len(self.links)} road links, highest priority first. Click one to zoom.")
+        what = VIEWS[self.view.currentText()][1]
+        note = " Costs are indicative civil works only." if build else ""
+        self.result.setText(f"{len(self.links)} {what}, highest priority first. Click one to zoom.{note}")
 
     def zoom_to_link(self, item: QListWidgetItem) -> None:
         link = item.data(Qt.ItemDataRole.UserRole)
-        line = QgsGeometry.fromPolylineXY([QgsPointXY(x, y) for x, y in link.coordinates])
+        # A build step is the street plus its connecting route: several lines
+        line = QgsGeometry.fromMultiPolylineXY([[QgsPointXY(x, y) for x, y in part] for part in link.lines])
         line.transform(self._to_canvas())
         canvas = self.iface.mapCanvas()
         canvas.setExtent(line.boundingBox().buffered(150))
@@ -111,8 +127,9 @@ class FibrePanel(QDockWidget):
 
     def add_links_layer(self) -> None:
         # OGR reads GeoJSON straight from the API URL
-        url = self.api().url("/v1/road-links", limit=self.limit.value())
-        layer = QgsVectorLayer(url, f"Top {self.limit.value()} road links (API)", "ogr")
+        path, what = VIEWS[self.view.currentText()]
+        url = self.api().url(path, limit=self.limit.value())
+        layer = QgsVectorLayer(url, f"Top {self.limit.value()} {what} (API)", "ogr")
         if not layer.isValid():
             self._show_error(ApiError(f"Could not load {url}"))
             return

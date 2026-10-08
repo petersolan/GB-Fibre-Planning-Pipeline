@@ -13,6 +13,7 @@ ROUTING = {
     "min_premises_for_existing": 1,
     "cost_multiplier": {"A Road": 3.0, "Local Road": 1.0},
     "default_multiplier": 1.0,
+    "civils_gbp_per_m": 100,
 }
 
 #   (1)--100m gigabit--(2)--100m A Road (cost 300)--(3)--50m gap--(5)
@@ -70,6 +71,24 @@ def test_route_gaps_takes_the_cheaper_detour(links, test_database):
         network.rename_geometry("geom").to_postgis("road_network", conn, schema="fibre", if_exists="append")
     engine.dispose()
 
+    with engine.begin() as conn:  # premises without gigabit come from the ranked links
+        conn.execute(text("TRUNCATE fibre.road_link_priority"))
+        ranked = links.assign(length_m=links.length, people_per_km=0.0).rename_geometry("geom")
+        ranked[
+            [
+                "road_link_id",
+                "road_function",
+                "length_m",
+                "premises",
+                "premises_no_gigabit",
+                "people_no_gigabit",
+                "people_per_km",
+                "priority_rank",
+                "geom",
+            ]
+        ].to_postgis("road_link_priority", conn, schema="fibre", if_exists="append")
+    engine.dispose()
+
     gaps, build, summary = route_gaps(network, None, ROUTING)
 
     (gap,) = gaps.itertuples()
@@ -83,3 +102,7 @@ def test_route_gaps_takes_the_cheaper_detour(links, test_database):
     assert roles == {"E3": "connection", "E4": "connection", "E5": "gap"}
     assert summary["connection_km"] == pytest.approx(0.25)
     assert summary["gap_links_reachable"] == 1
+    # Cost uses road-type-weighted length: route 150 + 100, street 50 -> 300 x GBP 100/m
+    assert gap.est_cost_gbp == pytest.approx(30_000)
+    assert gap.cost_per_premises_gbp == pytest.approx(7_500)  # 4 premises without gigabit
+    assert summary["build_cost_gbp"] == pytest.approx(30_000)

@@ -39,3 +39,7 @@ routing:
     Restricted Local Access Road: 1.0
     Secondary Access Road: 1.0
   default_multiplier: 1.0
+  # Indicative civil works (trenching where no duct exists) per metre of local road;
+  # Openreach figure reported by ISPreview (2017). Excludes equipment, drops and reuse
+  # of existing ducts or poles, so treat results as relative, order-of-magnitude costs
+  civils_gbp_per_m: 100

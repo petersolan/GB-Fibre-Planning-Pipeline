@@ -96,6 +96,8 @@ def build_plan(
 
     Each feature is the street plus its route from the existing gigabit network
     along the road network (pgRouting); ``connect_m`` is that route's length.
+    ``est_cost_gbp`` is an indicative civil-works cost (road-type-weighted length
+    x a per-metre rate), excluding equipment, drops and existing ducts.
     """
     rows = (
         conn.execute(
@@ -106,6 +108,9 @@ def build_plan(
                        round(connect_m::numeric, 1)::float AS connect_m,
                        round(total_m::numeric, 1)::float AS total_m,
                        round(people_per_km_total::numeric, 1)::float AS people_per_km_total,
+                       round(premises_no_gigabit::numeric, 1)::float AS premises_no_gigabit,
+                       round(est_cost_gbp::numeric, -2)::float AS est_cost_gbp,
+                       round(cost_per_premises_gbp::numeric)::float AS cost_per_premises_gbp,
                        ST_AsGeoJSON(ST_Transform(geom, 4326), 6) AS geojson
                 FROM fibre.gap_connection
                 ORDER BY build_rank

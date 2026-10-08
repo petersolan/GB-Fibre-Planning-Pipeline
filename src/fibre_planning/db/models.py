@@ -119,6 +119,10 @@ class GapConnection(Base):
     total_m: Mapped[float] = mapped_column(Float)
     people_per_km_total: Mapped[float] = mapped_column(Float)
     build_rank: Mapped[int] = mapped_column(Integer, unique=True)
+    premises_no_gigabit: Mapped[float] = mapped_column(Float)
+    # Indicative civil works only: cost-weighted route + street length x GBP per metre
+    est_cost_gbp: Mapped[float] = mapped_column(Float)
+    cost_per_premises_gbp: Mapped[float] = mapped_column(Float)
     geom = mapped_column(Geometry("MULTILINESTRING", srid=SRID, spatial_index=False), nullable=False)
 
 
@@ -132,4 +136,5 @@ class BuildRoute(Base):
     length_m: Mapped[float] = mapped_column(Float)
     gap_links_served: Mapped[int] = mapped_column(Integer)
     people_served: Mapped[float] = mapped_column(Float)
+    est_cost_gbp: Mapped[float] = mapped_column(Float)
     geom = mapped_column(Geometry("LINESTRING", srid=SRID, spatial_index=False), nullable=False)

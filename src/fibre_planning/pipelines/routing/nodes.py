@@ -88,8 +88,8 @@ ROUTING_SQL = [
     # Each gap street connects at its cheaper junction; the route excludes the street itself
     """CREATE TEMP TABLE gap_choice ON COMMIT DROP AS
        SELECT DISTINCT ON (g.edge_id)
-              g.edge_id, g.road_link_id, g.length_m AS street_m, g.people_no_gigabit, p.end_vid AS vid,
-              p.route_cost
+              g.edge_id, g.road_link_id, g.length_m AS street_m, g.cost AS street_cost,
+              g.people_no_gigabit, p.end_vid AS vid, p.route_cost
        FROM fibre.road_network g
        JOIN (SELECT end_vid, max(agg_cost) AS route_cost FROM paths GROUP BY end_vid) p
          ON p.end_vid IN (g.source, g.target)
@@ -121,6 +121,11 @@ GAP_CONNECTION_SQL = """
         GROUP BY u.gap_edge
     )
     SELECT c.road_link_id, rp.road_name, c.people_no_gigabit, c.street_m, l.connect_m,
+           coalesce(rp.premises_no_gigabit, 0) AS premises_no_gigabit,
+           -- route_cost and street_cost are already weighted by road type
+           (c.route_cost + c.street_cost) * :gbp_per_m AS est_cost_gbp,
+           (c.route_cost + c.street_cost) * :gbp_per_m
+               / greatest(coalesce(rp.premises_no_gigabit, 0), 0.01) AS cost_per_premises_gbp,
            c.street_m + l.connect_m AS total_m,
            c.people_no_gigabit / (greatest(c.street_m + l.connect_m, 1) / 1000) AS people_per_km_total,
            row_number() OVER (
@@ -142,6 +147,7 @@ BUILD_ROUTE_SQL = """
     SELECT n.road_link_id,
            CASE WHEN n.is_gap THEN 'gap' ELSE 'connection' END AS role,
            n.length_m,
+           n.cost * :gbp_per_m AS est_cost_gbp,
            count(DISTINCT u.gap_edge)::int AS gap_links_served,
            sum(g.people_no_gigabit) AS people_served,
            n.geom
@@ -164,8 +170,9 @@ def route_gaps(
     with engine.begin() as conn:
         for sql in ROUTING_SQL:
             conn.execute(text(sql))
-        gaps = gpd.read_postgis(text(GAP_CONNECTION_SQL), conn, geom_col="geom")
-        build = gpd.read_postgis(text(BUILD_ROUTE_SQL), conn, geom_col="geom")
+        rate = {"gbp_per_m": routing["civils_gbp_per_m"]}
+        gaps = gpd.read_postgis(text(GAP_CONNECTION_SQL), conn, geom_col="geom", params=rate)
+        build = gpd.read_postgis(text(BUILD_ROUTE_SQL), conn, geom_col="geom", params=rate)
     engine.dispose()
 
     gap_total = int(network["is_gap"].sum())
@@ -179,6 +186,11 @@ def route_gaps(
         "gap_street_km": round(float(gaps["street_m"].sum()) / 1000, 2),
         "median_connect_m": round(float(gaps["connect_m"].median()), 1),
         "people_reached": round(float(gaps["people_no_gigabit"].sum()), 1),
+        # Indicative civil works for the whole network (shared routes counted once)
+        "build_cost_gbp": round(float(build["est_cost_gbp"].sum()), -3),
+        "cost_per_premises_gbp": round(
+            float(build["est_cost_gbp"].sum()) / max(float(gaps["premises_no_gigabit"].sum()), 0.01)
+        ),
     }
     log.info("Routing: %s", summary)
     return gaps, build, summary

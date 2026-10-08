@@ -129,6 +129,9 @@ class GeoServer:
 def publish() -> list[str]:
     settings = GeoServerSettings()  # type: ignore[call-arg]
     gs = GeoServer(settings)
+    # Drop cached store and feature-type structure, so columns added by new
+    # migrations (e.g. est_cost_gbp) appear without restarting GeoServer
+    gs._check(gs.client.post("/reset"), "cache reset")
     gs.ensure_workspace()
     gs.ensure_store(settings)
     for table, (title, style) in LAYERS.items():

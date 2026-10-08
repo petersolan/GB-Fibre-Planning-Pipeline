@@ -26,6 +26,10 @@ duct and pole maps.
   without gigabit per km of that total.
 - The union of all chosen routes is the proposed build network
   (`fibre.build_route`), in which shared routes count once.
+- An indicative civil-works cost is the weighted length × £100/m
+  (`routing.civils_gbp_per_m`, Openreach's reported trenching cost where no
+  duct exists), per street and for the whole network, also per premises
+  without gigabit.
 
 ## Consequences
 
@@ -34,8 +38,11 @@ duct and pole maps.
 - The build network is a shortest-path tree, not an optimal Steiner tree, so
   total cable is an upper bound: connecting one street can make a neighbour
   cheaper, which the ranking does not re-evaluate.
-- Costs are relative, not money: there is no data on existing ducts, poles or
-  wayleaves, which dominate real costs.
+- The £ figures are order-of-magnitude, for comparing options: there is no
+  data on existing ducts, poles or wayleaves, which dominate real costs, and
+  equipment and drops are left out. Exeter comes to about £1,360 per premises
+  without gigabit, between Openreach's £300–£400 for easy areas and ~£4,000
+  for the hardest 10%.
 - Needs the pgRouting extension, so PostGIS runs from the
   `pgrouting/pgrouting` image (same PostgreSQL 17 / PostGIS 3.5 base), in
   Docker Compose and in CI.

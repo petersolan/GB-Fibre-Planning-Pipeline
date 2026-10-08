@@ -26,6 +26,7 @@ gigabit per km. GeoServer serves the same layers with the same SLD styles.*
 | Road links serving them | 722 of 6,402 |
 | Proposed new cable (pgRouting) | ≈ 101 km: 89 km along gap streets + 12 km connecting them |
 | Best 20 streets, including their connections | 2.9 km of cable reaching ≈ 4,300 people |
+| Indicative civil works for the whole network | ≈ £12.3 m, ≈ £1,360 per premises without gigabit |
 | Full pipeline run (24 nodes) | ≈ 20 s |
 
 The top-ranked streets are short access roads into dense blocks of flats and
@@ -50,6 +51,21 @@ and B roads weighted as dearer ([ADR 5](docs/adr/0005-routing-from-the-existing-
 *Proposed cable network (`fibre.build_route`): gap streets in red, connecting
 routes from the existing gigabit network in blue (darker where they serve
 100+ people). Most connections are short hops at junctions.*
+
+### Indicative cost
+
+Each street's cost is its road-type-weighted route and street length × £100
+per metre, Openreach's indicative trenching cost where no duct exists
+([ISPreview, 2017](https://www.ispreview.co.uk/index.php/2017/05/new-report-reveals-ways-cut-uk-rollout-cost-full-fibre-broadband.html));
+street works are around 70% of fibre build cost. For Exeter's whole proposed
+network that is about **£12.3 m, or £1,360 per premises without gigabit**:
+above the £300–£400 per premises Openreach quotes for the easiest half of the
+UK, and below the ~£4,000 for the final 10%
+([ISPreview, 2019](https://www.ispreview.co.uk/index.php/2019/08/openreach-fttp-final-10-of-uk-likely-to-cost-4000-per-premises.html)),
+which fits Exeter's remaining gaps being the harder ones. It is civil works
+only: no equipment, drops, existing ducts or poles, so use it to compare
+options, not as a budget. The rate is `routing.civils_gbp_per_m` in
+`conf/base/parameters.yml`.
 
 ## How it works
 
@@ -76,10 +92,16 @@ ingest ──► analysis ──► routing ──► publish ──► PostGIS 
    ([ADR 2](docs/adr/0002-alembic-owns-the-schema.md)), exports a Shapefile
    and a GeoPackage, and records each run with per-node timings.
 5. **serve**: a read-only FastAPI service (`/v1/build-plan` returns streets
-   in build order with their routes), GeoServer configured through its
+   in build order with their routes and indicative cost), GeoServer configured through its
    REST API, a QGIS project and a QGIS plugin.
 
 More in [docs/architecture.md](docs/architecture.md), with a diagram.
+
+![The API's interactive OpenAPI docs, with the build-plan endpoint open](docs/images/api_docs.png)
+
+*The API documents itself (OpenAPI at `/docs`). The QGIS plugin uses the same
+endpoints: its build-plan view lists streets with their connection distance and
+cost, and zooms to each street and its route.*
 
 ## Technology map
 
@@ -93,7 +115,7 @@ More in [docs/architecture.md](docs/architecture.md), with a diagram.
 | SQLAlchemy + Alembic | `src/fibre_planning/db/models.py`, `migrations/`; round-trip and model-drift tests |
 | Service and API design | `src/fibre_planning/api/`: versioned `/v1`, Pydantic contracts, OpenAPI at `/docs`, input limits |
 | GeoServer | Docker service; `python -m fibre_planning.geoserver` publishes over REST (idempotent); SLD styles |
-| QGIS and plugin development | `qgis_project/build_project.py` (PyQGIS), `qgis_plugin/` dock panel using QGIS's network stack, tested headless |
+| QGIS and plugin development | `qgis_project/build_project.py` (PyQGIS), `qgis_plugin/` dock panel (build plan with routes and cost, road links, postcode lookup) using QGIS's network stack, tested headless |
 | Observability | JSON request logs with request IDs, Prometheus `/metrics`, `/health` + `/ready`; Kedro hooks writing `logs/pipeline.jsonl` and run history |
 | Testing and quality | pytest (unit + integration on a seeded test database), ruff, mypy, pre-commit |
 | CI/CD | `.gitlab-ci.yml` and `.github/workflows/ci.yml`: lint, migrations, tests with PostGIS, image build |
@@ -124,7 +146,7 @@ pytest
 - GeoServer: http://127.0.0.1:8080/geoserver (layers in workspace `fibre`)
 - QGIS: open `qgis_project/fibre_planning.qgz` (3.34+)
 - QGIS plugin: `.\scripts\package.ps1 -NoPublish`, then install
-  `dist\fibre_planning_qgis-0.1.0.zip` via *Plugins > Install from ZIP*
+  `dist\fibre_planning_qgis-0.2.0.zip` via *Plugins > Install from ZIP*
 
 To plan another area, change `area.lad_code` in `conf/base/parameters.yml`.
 
@@ -160,3 +182,19 @@ Inputs go in `data/01_raw/` (not committed). The census outputs are read from
 | Local authority boundary | ONS Open Geography Portal, LAD May 2025 | OGL v3 |
 | Population per address | GB-Census-Population-Map (Census 2021/2022, ONSUD, OS Open Zoomstack) | OGL v3 |
 | Basemap in the QGIS project | OpenStreetMap | ODbL |
+
+### Attribution
+
+The maps, figures and outputs are derived from:
+
+- Contains Ofcom data, licensed under the
+  [Open Government Licence v3.0](https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/).
+- Contains OS data © Crown copyright and database right 2026.
+- Source: Office for National Statistics, licensed under the Open Government Licence v3.0.
+- Contains Royal Mail data © Royal Mail copyright and database right 2026.
+- © Crown copyright. Data supplied by National Records of Scotland.
+- Basemap in the QGIS project: © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright).
+
+## Licence
+
+Code: [MIT](LICENSE). Data and derived maps: see [Attribution](#attribution).

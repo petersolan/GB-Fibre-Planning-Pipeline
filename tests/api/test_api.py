@@ -55,6 +55,8 @@ def test_build_plan(client):
     assert feature["id"] == "LINK-B"
     assert feature["properties"]["build_rank"] == 1
     assert feature["properties"]["connect_m"] == 100
+    assert feature["properties"]["est_cost_gbp"] == 60000
+    assert feature["properties"]["cost_per_premises_gbp"] == 30000
     assert feature["geometry"]["type"] == "MultiLineString"
 
 
