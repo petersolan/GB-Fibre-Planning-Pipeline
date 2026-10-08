@@ -6,8 +6,8 @@ r"""Render qgis_project/fibre_planning.qgz to the README images (PyQGIS, no GUI)
 import sys
 from pathlib import Path
 
-from qgis.core import QgsApplication, QgsMapRendererParallelJob, QgsMapSettings, QgsProject, QgsRectangle
 from PIL import Image
+from qgis.core import QgsApplication, QgsMapRendererParallelJob, QgsMapSettings, QgsProject, QgsRectangle
 from qgis.PyQt.QtCore import QSize
 from qgis.PyQt.QtGui import QColor
 

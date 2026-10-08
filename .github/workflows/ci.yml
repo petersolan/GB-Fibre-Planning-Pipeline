@@ -24,8 +24,8 @@ jobs:
       - name: ruff
         shell: bash -el {0}
         run: |
-          ruff check src tests migrations
-          ruff format --check src tests migrations
+          ruff check src tests migrations qgis_project qgis_plugin
+          ruff format --check src tests migrations qgis_project qgis_plugin
       - name: mypy
         shell: bash -el {0}
         run: mypy src

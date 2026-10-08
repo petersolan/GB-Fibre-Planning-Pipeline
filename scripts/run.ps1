@@ -95,7 +95,7 @@ $tasks = @{
         }
     }
     test     = {
-        Invoke-Step "ruff" { Invoke-InEnv @("ruff", "check", "src", "tests", "migrations") }
+        Invoke-Step "ruff" { Invoke-InEnv @("ruff", "check", "src", "tests", "migrations", "qgis_project", "qgis_plugin") }
         Invoke-Step "mypy" { Invoke-InEnv @("mypy", "src") }
         Invoke-Step "pytest" { Invoke-InEnv @("pytest", "-q") }
     }

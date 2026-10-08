@@ -24,8 +24,8 @@ lint:
   stage: lint
   extends: .conda_env
   script:
-    - ruff check src tests migrations
-    - ruff format --check src tests migrations
+    - ruff check src tests migrations qgis_project qgis_plugin
+    - ruff format --check src tests migrations qgis_project qgis_plugin
     - mypy src
 
 test:

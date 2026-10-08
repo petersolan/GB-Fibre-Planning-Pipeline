@@ -19,13 +19,13 @@ repos:
         entry: ruff check --fix
         language: system
         types: [python]
-        files: ^(src|tests|migrations)/
+        files: ^(src|tests|migrations|qgis_project|qgis_plugin)/
       - id: ruff-format
         name: ruff format
         entry: ruff format
         language: system
         types: [python]
-        files: ^(src|tests|migrations)/
+        files: ^(src|tests|migrations|qgis_project|qgis_plugin)/
       # Never commit the real .env (only .env.example)
       - id: no-dotenv
         name: block .env files
