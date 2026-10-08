@@ -8,6 +8,7 @@ from qgis.core import (
     QgsGeometry,
     QgsPointXY,
     QgsProject,
+    QgsRectangle,
     QgsSettings,
     QgsVectorLayer,
 )
@@ -28,7 +29,7 @@ from qgis.PyQt.QtWidgets import (
     QWidget,
 )
 
-from .api_client import DEFAULT_API_URL, ApiError, FibreApi
+from .api_client import DEFAULT_API_URL, ApiError, Area, FibreApi
 
 SETTINGS_KEY = "fibre_planning/api_url"
 # view name -> (API path, label used for layers and messages)
@@ -37,6 +38,7 @@ VIEWS = {
     "Road links (street only)": ("/v1/road-links", "road links"),
 }
 WGS84 = QgsCoordinateReferenceSystem("EPSG:4326")
+ALL_AREAS = "All areas"
 
 
 class FibrePanel(QDockWidget):
@@ -44,6 +46,7 @@ class FibrePanel(QDockWidget):
         super().__init__("Fibre planning")
         self.iface = iface
         self.links = []
+        self.areas: dict[str, Area] = {}
         body = QWidget()
         layout = QVBoxLayout(body)
 
@@ -53,6 +56,18 @@ class FibrePanel(QDockWidget):
         )
         layout.addWidget(QLabel("API address"))
         layout.addWidget(self.api_url)
+
+        # Areas come from the API; picking one zooms to it and filters what follows
+        row = QHBoxLayout()
+        self.area = QComboBox()
+        self.area.addItem(ALL_AREAS, None)
+        self.area.activated.connect(self.zoom_to_area)
+        refresh = QPushButton("Refresh areas")
+        refresh.clicked.connect(self.load_areas)
+        row.addWidget(self.area, 1)
+        row.addWidget(refresh)
+        layout.addWidget(QLabel("Planning area"))
+        layout.addLayout(row)
 
         self.view = QComboBox()
         self.view.addItems(list(VIEWS))
@@ -86,6 +101,7 @@ class FibrePanel(QDockWidget):
         self.result = QLabel(wordWrap=True)
         layout.addWidget(self.result)
         self.setWidget(body)
+        self.load_areas()
 
     def api(self) -> FibreApi:
         return FibreApi(self.api_url.text() or DEFAULT_API_URL)
@@ -97,23 +113,61 @@ class FibrePanel(QDockWidget):
     def _show_error(self, error: Exception) -> None:
         self.result.setText(f"<span style='color:#b00'>{error}</span>")
 
+    def selected_area(self) -> str | None:
+        """The chosen area's district code, or None for all areas."""
+        return self.area.currentData()
+
+    def load_areas(self) -> None:
+        try:
+            areas = self.api().areas()
+        except ApiError as error:
+            self._show_error(error)
+            return
+        current = self.selected_area()
+        self.areas = {a.lad_code: a for a in areas}
+        self.area.clear()
+        self.area.addItem(ALL_AREAS, None)
+        for a in areas:
+            self.area.addItem(f"{a.name} ({a.lad_code})", a.lad_code)
+        self.area.setCurrentIndex(max(self.area.findData(current), 0))
+
+    def zoom_to_area(self) -> None:
+        chosen = [self.areas[self.selected_area()]] if self.selected_area() else list(self.areas.values())
+        if not chosen:
+            return
+        box = QgsRectangle(*chosen[0].bbox)
+        for a in chosen[1:]:
+            box.combineExtentWith(QgsRectangle(*a.bbox))
+        canvas = self.iface.mapCanvas()
+        canvas.setExtent(self._to_canvas().transformBoundingBox(box))
+        canvas.refresh()
+
+    def _label(self, link) -> str:
+        # Ranks are per area, so name the area when the list mixes them
+        if self.selected_area() or link.lad_code not in self.areas:
+            return link.label
+        return f"{self.areas[link.lad_code].name} {link.label}"
+
     def load_links(self) -> None:
         build = self.view.currentText().startswith("Build")
         try:
             api = self.api()
-            limit = self.limit.value()
-            self.links = api.build_plan(limit) if build else api.top_road_links(limit)
+            limit, area = self.limit.value(), self.selected_area()
+            self.links = api.build_plan(limit, area) if build else api.top_road_links(limit, area)
         except ApiError as error:
             self._show_error(error)
             return
         self.list.clear()
         for link in self.links:
-            item = QListWidgetItem(link.label)
+            item = QListWidgetItem(self._label(link))
             item.setData(Qt.ItemDataRole.UserRole, link)
             self.list.addItem(item)
         what = VIEWS[self.view.currentText()][1]
+        where = "across all areas" if self.selected_area() is None else f"in {self.area.currentText()}"
         note = " Costs are indicative civil works only." if build else ""
-        self.result.setText(f"{len(self.links)} {what}, highest priority first. Click one to zoom.{note}")
+        self.result.setText(
+            f"{len(self.links)} {what} {where}, highest priority first. Click one to zoom.{note}"
+        )
 
     def zoom_to_link(self, item: QListWidgetItem) -> None:
         link = item.data(Qt.ItemDataRole.UserRole)
@@ -128,8 +182,10 @@ class FibrePanel(QDockWidget):
     def add_links_layer(self) -> None:
         # OGR reads GeoJSON straight from the API URL
         path, what = VIEWS[self.view.currentText()]
-        url = self.api().url(path, limit=self.limit.value())
-        layer = QgsVectorLayer(url, f"Top {self.limit.value()} {what} (API)", "ogr")
+        area = self.selected_area()
+        url = self.api().url(path, limit=self.limit.value(), area=area)
+        where = f", {self.areas[area].name}" if area in self.areas else ""
+        layer = QgsVectorLayer(url, f"Top {self.limit.value()} {what}{where} (API)", "ogr")
         if not layer.isValid():
             self._show_error(ApiError(f"Could not load {url}"))
             return

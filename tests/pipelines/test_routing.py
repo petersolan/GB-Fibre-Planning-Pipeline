@@ -15,6 +15,8 @@ ROUTING = {
     "default_multiplier": 1.0,
     "civils_gbp_per_m": 100,
 }
+AREA = "E99000009"  # routing tests' own areas, so the seeded API data is left alone
+DECOY_AREA = "E99000010"
 
 #   (1)--100m gigabit--(2)--100m A Road (cost 300)--(3)--50m gap--(5)
 #                        \                          /
@@ -60,22 +62,44 @@ def test_build_road_network(links):
     assert bool(net.loc["E5", "is_gap"]) and net["is_gap"].sum() == 1
 
 
+@pytest.fixture
+def routing_areas(test_database):
+    """Removes the routing tests' rows afterwards, so other tests see only their own data."""
+    yield
+    from fibre_planning.db.config import get_settings
+
+    engine = create_engine(get_settings().owner_url)
+    with engine.begin() as conn:
+        for table in ("road_network", "road_link_priority"):
+            conn.execute(
+                text(f"DELETE FROM fibre.{table} WHERE lad_code IN (:a, :b)"), {"a": AREA, "b": DECOY_AREA}
+            )
+    engine.dispose()
+
+
 @pytest.mark.integration
-def test_route_gaps_takes_the_cheaper_detour(links, test_database):
+def test_route_gaps_takes_the_cheaper_detour(links, routing_areas):
     from fibre_planning.db.config import get_settings
 
     network = build_road_network(links, ROUTING)
+    # Another area with the same edge ids, where the direct A road is nearly free:
+    # routing must not see it
+    decoy = network.assign(lad_code=DECOY_AREA)
+    decoy.loc[decoy["road_link_id"] == "E2", "cost"] = 1.0
     engine = create_engine(get_settings().owner_url)
     with engine.begin() as conn:
-        conn.execute(text("TRUNCATE fibre.road_network"))
-        network.rename_geometry("geom").to_postgis("road_network", conn, schema="fibre", if_exists="append")
-    engine.dispose()
+        conn.execute(
+            text("DELETE FROM fibre.road_network WHERE lad_code IN (:a, :b)"), {"a": AREA, "b": DECOY_AREA}
+        )
+        for frame in (network.assign(lad_code=AREA), decoy):
+            frame.rename_geometry("geom").to_postgis("road_network", conn, schema="fibre", if_exists="append")
 
     with engine.begin() as conn:  # premises without gigabit come from the ranked links
-        conn.execute(text("TRUNCATE fibre.road_link_priority"))
-        ranked = links.assign(length_m=links.length, people_per_km=0.0).rename_geometry("geom")
+        conn.execute(text("DELETE FROM fibre.road_link_priority WHERE lad_code = :a"), {"a": AREA})
+        ranked = links.assign(length_m=links.length, people_per_km=0.0, lad_code=AREA).rename_geometry("geom")
         ranked[
             [
+                "lad_code",
                 "road_link_id",
                 "road_function",
                 "length_m",
@@ -89,7 +113,7 @@ def test_route_gaps_takes_the_cheaper_detour(links, test_database):
         ].to_postgis("road_link_priority", conn, schema="fibre", if_exists="append")
     engine.dispose()
 
-    gaps, build, summary = route_gaps(network, None, ROUTING)
+    gaps, build, summary = route_gaps(network, None, ROUTING, {"lad_code": AREA})
 
     (gap,) = gaps.itertuples()
     # Direct A-road route costs 300; the local detour (150 + 100 m) costs 250 and wins.

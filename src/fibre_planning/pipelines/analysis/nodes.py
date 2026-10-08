@@ -39,10 +39,15 @@ def attach_coverage(premises: gpd.GeoDataFrame, coverage: pd.DataFrame) -> gpd.G
 def snap_to_roads(
     premises: gpd.GeoDataFrame, roads: gpd.GeoDataFrame, analysis: dict[str, Any]
 ) -> gpd.GeoDataFrame:
-    """Nearest road link for each address and the drop distance to it."""
+    """Nearest road link for each address and the drop distance to it.
+
+    Roads a drop can't come from (motorways: no frontage access) are skipped, so
+    an address beside one snaps to its next-nearest road instead.
+    """
+    no_drop = roads["road_function"].isin(analysis.get("no_drop_functions", []))
     joined = gpd.sjoin_nearest(
         premises,
-        roads[["road_link_id", "geometry"]],
+        roads.loc[~no_drop, ["road_link_id", "geometry"]],
         how="left",
         max_distance=analysis["max_drop_m"],
         distance_col="drop_m",

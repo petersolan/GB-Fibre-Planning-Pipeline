@@ -2,8 +2,8 @@
 name=Fibre planning
 qgisMinimumVersion=3.34
 description=Browse gigabit broadband gaps and fibre build priorities from the fibre planning API.
-about=A dock panel for the GB-Fibre-Planning-Pipeline API: list road links in build-priority order and zoom to them, look up any postcode's gigabit coverage, and add the API's GeoJSON as layers. Uses QGIS's network settings (proxy, SSL).
-version=0.2.0
+about=A dock panel for the GB-Fibre-Planning-Pipeline API: pick a planning area (or all of them), list road links in build-priority order and zoom to them, look up any postcode's gigabit coverage, and add the API's GeoJSON as layers. Uses QGIS's network settings (proxy, SSL).
+version=0.3.0
 author=Peter S
 email=petersolan@users.noreply.github.com
 homepage=https://github.com/petersolan/GB-Fibre-Planning-Pipeline

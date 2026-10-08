@@ -1,6 +1,7 @@
-# Area to plan for: an ONS local authority district code
+# Area to plan for: an ONS local authority district code. Each area's results are
+# kept side by side in PostGIS; the default is in globals.yml
 area:
-  lad_code: E07000041   # Exeter
+  lad_code: ${runtime_params:area.lad_code, ${globals:default_area}}
 
 boundary_api:
   url: https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/LAD_MAY_2025_UK_BGC_V2/FeatureServer/0/query
@@ -22,6 +23,9 @@ roads:
 
 analysis:
   max_drop_m: 150        # premises further than this from any road are left unassigned
+  # Road types an address can't be served from: without this, farms beside the M5
+  # snapped to it and made a 15.6 km motorway link a "gap street" in Mid Devon
+  no_drop_functions: [Motorway]
   min_people_to_rank: 1  # rank only road links serving at least this many people without gigabit
 
 # Routing (pgRouting): connect gap streets to the existing gigabit network

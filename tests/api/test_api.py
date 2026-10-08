@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
-from tests.conftest import TEST_LAD
+from tests.conftest import TEST_LAD, TEST_LAD_2
 
 pytestmark = pytest.mark.integration
 
@@ -40,17 +40,40 @@ def test_area_summary_validates_code(client):
     assert client.get("/v1/areas/E99999999/summary").status_code == 404
 
 
+def test_areas_listed_with_latest_run(client):
+    body = client.get("/v1/areas").json()
+    assert [a["name"] for a in body] == ["Testshire", "Testville"]
+    testville = body[1]
+    assert testville["lad_code"] == TEST_LAD
+    assert testville["gigabit_coverage_pct"] == 50
+    min_lon, min_lat, max_lon, max_lat = testville["bbox"]
+    assert -3.55 < min_lon < max_lon < -3.52 and 50.71 < min_lat < max_lat < 50.73
+
+
 def test_road_links_ranked_only(client):
-    body = client.get("/v1/road-links").json()
+    body = client.get("/v1/road-links", params={"area": TEST_LAD}).json()
     assert body["type"] == "FeatureCollection"
     assert [f["id"] for f in body["features"]] == ["LINK-B"]  # LINK-A has nobody without gigabit
     assert body["features"][0]["properties"]["people_per_km"] == 10
+    assert body["features"][0]["properties"]["lad_code"] == TEST_LAD
     lon, lat = body["features"][0]["geometry"]["coordinates"][0]
     assert -3.6 < lon < -3.4 and 50.6 < lat < 50.8  # returned in WGS84
 
 
+def test_road_links_across_areas(client):
+    """Without an area, links from every area in one order; a shared link appears per area."""
+    features = client.get("/v1/road-links").json()["features"]
+    order = [(f["properties"]["lad_code"], f["id"], f["properties"]["priority_rank"]) for f in features]
+    assert order == [(TEST_LAD_2, "LINK-C", 1), (TEST_LAD, "LINK-B", 1), (TEST_LAD_2, "LINK-B", 2)]
+
+
+def test_area_filter_validated(client):
+    assert client.get("/v1/road-links", params={"area": "Exeter"}).status_code == 422
+    assert client.get("/v1/road-links", params={"area": "E99999999"}).json()["count"] == 0
+
+
 def test_build_plan(client):
-    body = client.get("/v1/build-plan").json()
+    body = client.get("/v1/build-plan", params={"area": TEST_LAD}).json()
     (feature,) = body["features"]
     assert feature["id"] == "LINK-B"
     assert feature["properties"]["build_rank"] == 1
@@ -60,12 +83,23 @@ def test_build_plan(client):
     assert feature["geometry"]["type"] == "MultiLineString"
 
 
+def test_build_plan_across_areas(client):
+    features = client.get("/v1/build-plan").json()["features"]
+    # Far Close: 4 people per 200 m beats Low Lane: 5 people per 600 m
+    assert [(f["properties"]["lad_code"], f["id"]) for f in features] == [
+        (TEST_LAD_2, "LINK-C"),
+        (TEST_LAD, "LINK-B"),
+    ]
+
+
 def test_premises_bbox(client):
     body = client.get("/v1/premises", params={"bbox": TESTVILLE_BBOX}).json()
     assert body["count"] == 4
     assert {f["id"] for f in body["features"]} == {1, 2, 3, 4}
     limited = client.get("/v1/premises", params={"bbox": TESTVILLE_BBOX, "limit": 2}).json()
     assert limited["count"] == 2
+    other_area = client.get("/v1/premises", params={"bbox": TESTVILLE_BBOX, "area": TEST_LAD_2}).json()
+    assert other_area["count"] == 0
 
 
 @pytest.mark.parametrize("bbox", ["1,2,3", "a,b,c,d", "-3.5,50.7,-3.6,50.8", "-3.6,50.6,-3.4,50.8"])
@@ -74,11 +108,21 @@ def test_premises_bbox_rejects_bad_input(client, bbox):
 
 
 def test_postcode_normalised(client):
-    body = client.get("/v1/postcodes/ex22bb").json()
-    assert body["postcode"] == "EX2 2BB"
-    assert body["gigabit_pct"] == 0
+    body = client.get("/v1/postcodes/ex11aa").json()
+    assert body["postcode"] == "EX1 1AA"
+    assert body["gigabit_pct"] == 100
     assert client.get("/v1/postcodes/NOTAPOSTCODE").status_code == 422
     assert client.get("/v1/postcodes/ZZ9 9ZZ").status_code == 404
+
+
+def test_postcode_straddling_two_areas(client):
+    """EX2 2BB has premises in both areas: added up, or one area's part on request."""
+    both = client.get("/v1/postcodes/EX2 2BB").json()
+    assert (both["premises"], both["population"], both["people_no_gigabit"]) == (3, 8, 8)
+    assert both["gigabit_pct"] == 0
+    one = client.get("/v1/postcodes/EX2 2BB", params={"area": TEST_LAD_2}).json()
+    assert (one["premises"], one["population"]) == (1, 3)
+    assert client.get("/v1/postcodes/EX1 1AA", params={"area": TEST_LAD_2}).status_code == 404
 
 
 def test_reader_role_cannot_write(seeded_database):

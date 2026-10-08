@@ -1,99 +1,110 @@
 # Datasets not listed here are kept in memory between nodes.
 
+# The area this run plans for (same value as params:area.lad_code). Files go in a
+# folder per area; PostGIS datasets read and replace only that area's rows.
+_area: ${runtime_params:area.lad_code, ${globals:default_area}}
+
 # --- ingest -------------------------------------------------------------
 boundary:
   type: fibre_planning.datasets.vector_file.VectorFileDataset
-  filepath: data/02_intermediate/boundary.gpkg
+  filepath: data/02_intermediate/${_area}/boundary.gpkg
 
 premises_valid:
   type: geopandas.GenericDataset
-  filepath: data/02_intermediate/premises.parquet
+  filepath: data/02_intermediate/${_area}/premises.parquet
   file_format: parquet
 
 ofcom_coverage:
   type: pandas.ParquetDataset
-  filepath: data/02_intermediate/ofcom_coverage.parquet
+  filepath: data/02_intermediate/${_area}/ofcom_coverage.parquet
 
 road_links:
   type: geopandas.GenericDataset
-  filepath: data/02_intermediate/road_links.parquet
+  filepath: data/02_intermediate/${_area}/road_links.parquet
   file_format: parquet
 
 # --- analysis -----------------------------------------------------------
 premises:
   type: geopandas.GenericDataset
-  filepath: data/03_primary/premises_coverage.parquet
+  filepath: data/03_primary/${_area}/premises_coverage.parquet
   file_format: parquet
 
 road_link_priority:
   type: geopandas.GenericDataset
-  filepath: data/03_primary/road_link_priority.parquet
+  filepath: data/03_primary/${_area}/road_link_priority.parquet
   file_format: parquet
 
 postcode_coverage:
   type: geopandas.GenericDataset
-  filepath: data/03_primary/postcode_coverage.parquet
+  filepath: data/03_primary/${_area}/postcode_coverage.parquet
   file_format: parquet
 
 area_summary:
   type: json.JSONDataset
-  filepath: data/08_reporting/area_summary.json
+  filepath: data/08_reporting/${_area}/area_summary.json
 
 # --- publish: PostGIS (schema owned by Alembic) ---------------------------
 db_area_boundary:
   type: fibre_planning.datasets.postgis.PostGISDataset
+  area_code: ${_area}
   table: area_boundary
 
 db_premises:
   type: fibre_planning.datasets.postgis.PostGISDataset
+  area_code: ${_area}
   table: premises
 
 db_postcode_coverage:
   type: fibre_planning.datasets.postgis.PostGISDataset
+  area_code: ${_area}
   table: postcode_coverage
 
 db_road_link_priority:
   type: fibre_planning.datasets.postgis.PostGISDataset
+  area_code: ${_area}
   table: road_link_priority
 
 # --- publish: files for QGIS and other tools ------------------------------
 road_priority_shp:
   type: fibre_planning.datasets.vector_file.VectorFileDataset
-  filepath: data/07_model_output/road_priority.shp
+  filepath: data/07_model_output/${_area}/road_priority.shp
   driver: ESRI Shapefile
 
 road_priority_gpkg:
   type: fibre_planning.datasets.vector_file.VectorFileDataset
-  filepath: data/07_model_output/fibre_planning.gpkg
+  filepath: data/07_model_output/${_area}/fibre_planning.gpkg
   layer: road_link_priority
 
 # --- routing (pgRouting) --------------------------------------------------
 db_road_network:
   type: fibre_planning.datasets.postgis.PostGISDataset
+  area_code: ${_area}
   table: road_network
 
 db_gap_connection:
   type: fibre_planning.datasets.postgis.PostGISDataset
+  area_code: ${_area}
   table: gap_connection
 
 db_build_route:
   type: fibre_planning.datasets.postgis.PostGISDataset
+  area_code: ${_area}
   table: build_route
 
 build_route_gpkg:
   type: fibre_planning.datasets.vector_file.VectorFileDataset
-  filepath: data/07_model_output/fibre_planning.gpkg
+  filepath: data/07_model_output/${_area}/fibre_planning.gpkg
   layer: build_route
 
 gap_connection_gpkg:
   type: fibre_planning.datasets.vector_file.VectorFileDataset
-  filepath: data/07_model_output/fibre_planning.gpkg
+  filepath: data/07_model_output/${_area}/fibre_planning.gpkg
   layer: gap_connection
 
 routing_summary:
   type: json.JSONDataset
-  filepath: data/08_reporting/routing_summary.json
+  filepath: data/08_reporting/${_area}/routing_summary.json
 
 run_summary:
   type: json.JSONDataset
-  filepath: data/08_reporting/run_summary.json
+  filepath: data/08_reporting/${_area}/run_summary.json

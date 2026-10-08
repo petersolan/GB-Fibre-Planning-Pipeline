@@ -63,6 +63,20 @@ def test_snap_and_rank(premises, roads):
     assert links.loc["B", "priority_rank"] == 2
 
 
+def test_snap_skips_roads_without_drops(premises, roads):
+    """An address beside a motorway is served from the next-nearest road."""
+    motorway = gpd.GeoDataFrame(
+        {"road_link_id": ["M"], "road_function": ["Motorway"], "road_name": ["M5"]},
+        geometry=[LineString([(0, 12), (200, 12)])],  # 2 m from addresses 1 and 2
+        crs=CRS,
+    )
+    all_roads = pd.concat([roads, motorway], ignore_index=True)
+    coverage = pd.DataFrame({"postcode": ["EX1 1AA", "EX2 2BB"], "gigabit_pct": [50.0, 0.0]})
+    analysis = {"max_drop_m": 150, "no_drop_functions": ["Motorway"]}
+    snapped = snap_to_roads(attach_coverage(premises, coverage), all_roads, analysis)
+    assert snapped["road_link_id"].tolist() == ["A", "A", "B"]
+
+
 def test_validate_premises_rejects_duplicates(premises):
     boundary = gpd.GeoDataFrame({"lad_code": ["X"]}, geometry=[box(-10, -10, 200, 600)], crs=CRS)
     with pytest.raises(ValueError, match="Duplicate UPRNs"):

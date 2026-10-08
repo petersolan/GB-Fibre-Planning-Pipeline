@@ -1,0 +1,3 @@
+# Area planned when none is given. Run another with:
+#   kedro run --params area.lad_code=E07000042
+default_area: E07000041   # Exeter

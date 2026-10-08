@@ -31,7 +31,7 @@ GEOSERVER_WMS = "http://127.0.0.1:8080/geoserver/fibre/wms"
 
 # (table, geometry type, layer name, SLD style or None)
 POSTGIS_LAYERS = [
-    ("area_boundary", "MultiPolygon", "Planning area", "area_boundary"),
+    ("area_boundary", "MultiPolygon", "Planning areas", "area_boundary"),
     ("road_link_priority", "LineString", "Road links: build priority", "road_link_priority"),
     ("build_route", "LineString", "Proposed cable network", "build_route"),
     ("premises", "Point", "Premises: gigabit coverage", "premises_coverage"),
@@ -52,7 +52,7 @@ def main() -> int:
     app = QgsApplication([], False)
     app.initQgis()
     project = QgsProject.instance()
-    project.setTitle("Fibre planning: Exeter")
+    project.setTitle("Fibre planning: Exeter and Mid Devon")
     project.setCrs(QgsCoordinateReferenceSystem("EPSG:27700"))
     root = project.layerTreeRoot()
 
@@ -63,12 +63,13 @@ def main() -> int:
     root.addLayer(basemap)
 
     db_group = root.insertGroup(0, "PostGIS (service=fibre)")
+    # Tables hold several areas, so keys lead with lad_code (a border road link is in both)
     keys = {
-        "area_boundary": "lad_code",
-        "road_link_priority": "road_link_id",
-        "build_route": "road_link_id",
-        "premises": "uprn",
-        "postcode_coverage": "postcode",
+        "area_boundary": '"lad_code"',
+        "road_link_priority": '"lad_code","road_link_id"',
+        "build_route": '"lad_code","road_link_id"',
+        "premises": '"lad_code","uprn"',
+        "postcode_coverage": '"lad_code","postcode"',
     }
     for table, geom_type, name, style in POSTGIS_LAYERS:
         layer = postgis_layer(table, geom_type, name, keys[table])
@@ -95,7 +96,7 @@ def main() -> int:
     project.addMapLayer(wms, False)
     wms_group.addLayer(wms)
 
-    extent = project.mapLayersByName("Planning area")[0].extent()
+    extent = project.mapLayersByName("Planning areas")[0].extent()
     extent.scale(1.05)
     project.viewSettings().setDefaultViewExtent(QgsReferencedRectangle(extent, project.crs()))
     ok = project.write(str(OUT))

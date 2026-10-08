@@ -23,6 +23,12 @@ VIEWS = [
         QgsRectangle(291800, 92200, 293900, 93775),
         {"Premises: gigabit coverage", "Road links: build priority"},
     ),
+    # Both areas: the proposed cable network in the city and the countryside
+    (
+        "qgis_areas.png",
+        QgsRectangle(262000, 85000, 322000, 130000),
+        {"Premises: gigabit coverage", "Road links: build priority"},
+    ),
 ]
 
 

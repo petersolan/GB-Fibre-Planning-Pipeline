@@ -19,7 +19,7 @@ def create_pipeline(**kwargs) -> Pipeline:
             node(_identity, "road_network", "db_road_network", name="load_db_road_network"),
             node(
                 route_gaps,
-                ["db_road_network", "db_road_link_priority", "params:routing"],
+                ["db_road_network", "db_road_link_priority", "params:routing", "params:area"],
                 ["gap_connection", "build_route", "routing_summary"],
                 name="route_gaps",
             ),

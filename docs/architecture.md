@@ -25,7 +25,7 @@ flowchart LR
     end
 
     ONS & CEN & OFC & OSR --> ING
-    PUB -->|"owner role<br/>TRUNCATE + INSERT"| PG
+    PUB -->|"owner role<br/>replace the area's rows"| PG
     PUB --> FILES["Shapefile / GeoPackage"]
     PG -->|"fibre_reader"| API
     PG -->|"fibre_reader"| GS
@@ -54,6 +54,11 @@ flowchart LR
 - **Alembic owns the schema.** The pipeline never creates or alters tables: it
   replaces rows inside one transaction, so indexes, constraints and grants
   survive every run and a failed load leaves the previous data in place.
+- **Several areas, one run each.** Every table is keyed by `lad_code` first. A
+  run plans one area (`--params area.lad_code=...`) and replaces only that
+  area's rows, so Exeter and Mid Devon sit side by side
+  ([ADR 6](adr/0006-several-areas-side-by-side.md)). The API, GeoServer layers
+  and QGIS project show all areas; the API and the plugin can filter to one.
 - **Two database roles.** `fibre_owner` migrates and loads; `fibre_reader` can
   only `SELECT` and is what the API, GeoServer and QGIS use.
 - **Coordinates.** Everything is stored in British National Grid (EPSG:27700),

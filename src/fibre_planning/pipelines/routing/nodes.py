@@ -69,18 +69,23 @@ def build_road_network(links: gpd.GeoDataFrame, routing: dict[str, Any]) -> gpd.
 
 
 ROUTING_SQL = [
+    # This area's graph (vertex ids are per area), keyed on edge_id for the joins below
+    """CREATE TEMP TABLE net ON COMMIT DROP AS
+       SELECT * FROM fibre.road_network WHERE lad_code = :lad""",
+    "ALTER TABLE net ADD PRIMARY KEY (edge_id)",
+    "ANALYZE net",
     # Start points: every junction of a link that already has gigabit
     """CREATE TEMP TABLE sources ON COMMIT DROP AS
-       SELECT DISTINCT v AS vid FROM fibre.road_network, unnest(ARRAY[source, target]) AS v
+       SELECT DISTINCT v AS vid FROM net, unnest(ARRAY[source, target]) AS v
        WHERE has_gigabit""",
     # Destinations: both junctions of every gap street
     """CREATE TEMP TABLE gap_vertices ON COMMIT DROP AS
-       SELECT DISTINCT v AS vid FROM fibre.road_network, unnest(ARRAY[source, target]) AS v
+       SELECT DISTINCT v AS vid FROM net, unnest(ARRAY[source, target]) AS v
        WHERE is_gap""",
     # One Dijkstra run from the super-source, which reaches every start point at zero cost
     f"""CREATE TEMP TABLE paths ON COMMIT DROP AS
        SELECT * FROM pgr_dijkstra(
-           'SELECT edge_id AS id, source, target, cost, cost AS reverse_cost FROM fibre.road_network
+           'SELECT edge_id AS id, source, target, cost, cost AS reverse_cost FROM net
             UNION ALL
             SELECT -vid AS id, {SUPER_SOURCE} AS source, vid AS target, 0 AS cost, 0 AS reverse_cost
             FROM sources',
@@ -90,7 +95,7 @@ ROUTING_SQL = [
        SELECT DISTINCT ON (g.edge_id)
               g.edge_id, g.road_link_id, g.length_m AS street_m, g.cost AS street_cost,
               g.people_no_gigabit, p.end_vid AS vid, p.route_cost
-       FROM fibre.road_network g
+       FROM net g
        JOIN (SELECT end_vid, max(agg_cost) AS route_cost FROM paths GROUP BY end_vid) p
          ON p.end_vid IN (g.source, g.target)
        WHERE g.is_gap
@@ -106,7 +111,7 @@ GAP_CONNECTION_SQL = """
         SELECT c.edge_id, coalesce(sum(n.length_m), 0) AS connect_m
         FROM gap_choice c
         LEFT JOIN gap_route_edges r ON r.gap_edge = c.edge_id
-        LEFT JOIN fibre.road_network n ON n.edge_id = r.route_edge
+        LEFT JOIN net n ON n.edge_id = r.route_edge
         GROUP BY c.edge_id
     ), shapes AS (
         -- The street itself plus its route edges, as (gap, edge) pairs joined on the
@@ -117,7 +122,7 @@ GAP_CONNECTION_SQL = """
             UNION ALL
             SELECT edge_id, edge_id FROM gap_choice
         ) u
-        JOIN fibre.road_network n ON n.edge_id = u.edge
+        JOIN net n ON n.edge_id = u.edge
         GROUP BY u.gap_edge
     )
     SELECT c.road_link_id, rp.road_name, c.people_no_gigabit, c.street_m, l.connect_m,
@@ -135,7 +140,7 @@ GAP_CONNECTION_SQL = """
     FROM gap_choice c
     JOIN lengths l USING (edge_id)
     JOIN shapes s USING (edge_id)
-    LEFT JOIN fibre.road_link_priority rp ON rp.road_link_id = c.road_link_id
+    LEFT JOIN fibre.road_link_priority rp ON rp.lad_code = :lad AND rp.road_link_id = c.road_link_id
 """
 
 BUILD_ROUTE_SQL = """
@@ -152,27 +157,28 @@ BUILD_ROUTE_SQL = """
            sum(g.people_no_gigabit) AS people_served,
            n.geom
     FROM used u
-    JOIN fibre.road_network n ON n.edge_id = u.edge_id
-    JOIN fibre.road_network g ON g.edge_id = u.gap_edge
+    JOIN net n ON n.edge_id = u.edge_id
+    JOIN net g ON g.edge_id = u.gap_edge
     GROUP BY n.edge_id
 """
 
 
 def route_gaps(
-    network: gpd.GeoDataFrame, _ranked_links: gpd.GeoDataFrame, routing: dict[str, Any]
+    network: gpd.GeoDataFrame, _ranked_links: gpd.GeoDataFrame, routing: dict[str, Any], area: dict[str, Any]
 ) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame, dict[str, Any]]:
-    """Run the routing in PostGIS on fibre.road_network.
+    """Run the routing in PostGIS on the area's rows of fibre.road_network.
 
-    Both inputs are the loaded database tables: taking them makes Kedro run this
-    after the graph and the ranked links (used for street names) are saved.
+    Both inputs are the area's loaded database rows: taking them makes Kedro run
+    this after the graph and the ranked links (used for street names) are saved.
     """
+    lad = {"lad": area["lad_code"]}
     engine = create_engine(get_settings().owner_url)
     with engine.begin() as conn:
         for sql in ROUTING_SQL:
-            conn.execute(text(sql))
-        rate = {"gbp_per_m": routing["civils_gbp_per_m"]}
-        gaps = gpd.read_postgis(text(GAP_CONNECTION_SQL), conn, geom_col="geom", params=rate)
-        build = gpd.read_postgis(text(BUILD_ROUTE_SQL), conn, geom_col="geom", params=rate)
+            conn.execute(text(sql), lad)
+        params = {**lad, "gbp_per_m": routing["civils_gbp_per_m"]}
+        gaps = gpd.read_postgis(text(GAP_CONNECTION_SQL), conn, geom_col="geom", params=params)
+        build = gpd.read_postgis(text(BUILD_ROUTE_SQL), conn, geom_col="geom", params=params)
     engine.dispose()
 
     gap_total = int(network["is_gap"].sum())

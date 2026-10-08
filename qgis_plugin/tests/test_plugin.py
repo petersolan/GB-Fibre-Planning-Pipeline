@@ -22,6 +22,7 @@ from fibre_planning_qgis.api_client import (  # noqa: E402
     ApiError,
     FibreApi,
     normalise_postcode,
+    parse_areas,
     parse_build_plan,
     parse_road_links,
 )
@@ -34,6 +35,7 @@ SAMPLE = {
             "id": "LINK-B",
             "geometry": {"type": "LineString", "coordinates": [[-3.53, 50.72], [-3.52, 50.72]]},
             "properties": {
+                "lad_code": "E99000001",
                 "priority_rank": 1,
                 "road_name": None,
                 "road_function": "Local Road",
@@ -60,6 +62,20 @@ class ParsingTests(unittest.TestCase):
         self.assertEqual(link.rank, 1)
         self.assertEqual(link.name, "Local Road")  # falls back when the road has no name
         self.assertIn("5 people without gigabit", link.label)
+        self.assertEqual(link.lad_code, "E99000001")
+
+    def test_parse_areas(self):
+        (area,) = parse_areas(
+            [{"lad_code": "E07000042", "name": "Mid Devon", "bbox": [-3.9, 50.7, -3.1, 51.0]}]
+        )
+        self.assertEqual((area.name, area.bbox[0]), ("Mid Devon", -3.9))
+
+    def test_url_leaves_out_unset_filters(self):
+        api = FibreApi("http://example.test/")
+        self.assertEqual(
+            api.url("/v1/build-plan", limit=5, area=None), "http://example.test/v1/build-plan?limit=5"
+        )
+        self.assertIn("area=E07000042", api.url("/v1/build-plan", limit=5, area="E07000042"))
 
     def test_parse_build_plan(self):
         collection = {
@@ -98,8 +114,10 @@ class ParsingTests(unittest.TestCase):
 @unittest.skipUnless(api_available(), "API not running on 127.0.0.1:8000")
 class LiveApiTests(unittest.TestCase):
     def test_top_road_links_ranked(self):
-        links = FibreApi().top_road_links(5)
-        self.assertEqual([link.rank for link in links], [1, 2, 3, 4, 5])
+        for area in FibreApi().areas():
+            links = FibreApi().top_road_links(5, area.lad_code)
+            self.assertEqual([link.rank for link in links], [1, 2, 3, 4, 5], area.name)
+            self.assertEqual({link.lad_code for link in links}, {area.lad_code})
 
     def test_postcode_round_trip(self):
         first = FibreApi().top_road_links(1)[0]
@@ -127,21 +145,33 @@ class PanelTests(unittest.TestCase):
                 return canvas
 
         panel = FibrePanel(Iface())
+        self.assertGreaterEqual(panel.area.count(), 2)  # "All areas" plus at least one area
+        panel.area.setCurrentIndex(panel.area.findData("E07000041"))  # Exeter
+        panel.zoom_to_area()
+        self.assertTrue(280_000 < canvas.extent().center().x() < 300_000, canvas.extent().toString())
         panel.limit.setValue(10)
         for view in ("Build plan (with routes)", "Road links (street only)"):
             panel.view.setCurrentText(view)
             panel.load_links()
             self.assertEqual(panel.list.count(), 10, view)
+            self.assertEqual({link.lad_code for link in panel.links}, {"E07000041"})
             panel.zoom_to_link(panel.list.item(0))
             extent = canvas.extent()
             self.assertTrue(280_000 < extent.center().x() < 300_000, extent.toString())  # Exeter, BNG
+
+        panel.area.setCurrentIndex(0)  # all areas: items name their area
+        panel.load_links()
+        self.assertTrue(
+            panel.list.item(0).text().startswith(("Exeter", "Mid Devon")), panel.list.item(0).text()
+        )
 
         panel.postcode.setText("ex4 4qj")
         panel.lookup_postcode()
         self.assertIn("EX4 4QJ", panel.result.text())
 
+        panel.area.setCurrentIndex(panel.area.findData("E07000041"))
         panel.add_links_layer()
-        layers = QgsProject.instance().mapLayersByName("Top 10 road links (API)")
+        layers = QgsProject.instance().mapLayersByName("Top 10 road links, Exeter (API)")
         self.assertEqual(layers[0].featureCount(), 10)
 
 

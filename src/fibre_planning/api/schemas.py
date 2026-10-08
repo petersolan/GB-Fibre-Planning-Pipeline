@@ -16,6 +16,16 @@ class Ready(BaseModel):
     last_run_at: datetime | None
 
 
+class Area(BaseModel):
+    lad_code: str
+    name: str
+    run_at: datetime | None = Field(description="Latest pipeline run for the area")
+    premises: int | None
+    gigabit_coverage_pct: float | None
+    people_no_gigabit: float | None
+    bbox: list[float] = Field(description="min_lon, min_lat, max_lon, max_lat (WGS84)")
+
+
 class AreaSummary(BaseModel):
     lad_code: str
     name: str

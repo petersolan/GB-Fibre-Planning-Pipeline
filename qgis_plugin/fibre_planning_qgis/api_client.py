@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
+from typing import Any
 from urllib.parse import quote, urlencode
 
 from qgis.core import QgsBlockingNetworkRequest
@@ -27,9 +28,17 @@ class ApiError(Exception):
 
 
 @dataclass(frozen=True)
+class Area:
+    lad_code: str
+    name: str
+    bbox: list[float]  # WGS84 min_lon, min_lat, max_lon, max_lat
+
+
+@dataclass(frozen=True)
 class RoadLink:
     road_link_id: str
-    rank: int
+    lad_code: str
+    rank: int  # within its area
     name: str
     people_no_gigabit: float
     people_per_km: float
@@ -53,7 +62,8 @@ class BuildStep:
     """A gap street with its route from the existing gigabit network (pgRouting)."""
 
     road_link_id: str
-    rank: int
+    lad_code: str
+    rank: int  # within its area
     name: str
     people_no_gigabit: float
     connect_m: float
@@ -98,6 +108,7 @@ def parse_road_links(collection: dict) -> list[RoadLink]:
         links.append(
             RoadLink(
                 road_link_id=str(feature["id"]),
+                lad_code=props.get("lad_code", ""),
                 rank=int(props["priority_rank"]),
                 name=props.get("road_name") or props.get("road_function") or "Unnamed road",
                 people_no_gigabit=float(props["people_no_gigabit"]),
@@ -120,6 +131,7 @@ def parse_build_plan(collection: dict) -> list[BuildStep]:
         steps.append(
             BuildStep(
                 road_link_id=str(feature["id"]),
+                lad_code=props.get("lad_code", ""),
                 rank=int(props["build_rank"]),
                 name=props.get("road_name") or "Unnamed road",
                 people_no_gigabit=float(props["people_no_gigabit"]),
@@ -131,6 +143,10 @@ def parse_build_plan(collection: dict) -> list[BuildStep]:
             )
         )
     return steps
+
+
+def parse_areas(areas: list[dict]) -> list[Area]:
+    return [Area(lad_code=a["lad_code"], name=a["name"], bbox=a["bbox"]) for a in areas]
 
 
 def normalise_postcode(text: str) -> str:
@@ -148,10 +164,12 @@ class FibreApi:
         self.base_url = base_url.rstrip("/")
 
     def url(self, path: str, **params: object) -> str:
+        # None means "not given" (e.g. no area filter: all areas)
+        params = {k: v for k, v in params.items() if v is not None}
         query = f"?{urlencode(params)}" if params else ""
         return f"{self.base_url}{path}{query}"
 
-    def _get(self, path: str, **params: object) -> dict:
+    def _get(self, path: str, **params: object) -> Any:  # a JSON object or list
         request = QgsBlockingNetworkRequest()
         error = request.get(QNetworkRequest(QUrl(self.url(path, **params))), forceRefresh=True)
         reply = request.reply()
@@ -167,11 +185,14 @@ class FibreApi:
     def health(self) -> bool:
         return self._get("/health").get("status") == "ok"
 
-    def top_road_links(self, limit: int = 20) -> list[RoadLink]:
-        return parse_road_links(self._get("/v1/road-links", limit=limit))
+    def areas(self) -> list[Area]:
+        return parse_areas(self._get("/v1/areas"))
 
-    def build_plan(self, limit: int = 20) -> list[BuildStep]:
-        return parse_build_plan(self._get("/v1/build-plan", limit=limit))
+    def top_road_links(self, limit: int = 20, area: str | None = None) -> list[RoadLink]:
+        return parse_road_links(self._get("/v1/road-links", limit=limit, area=area))
+
+    def build_plan(self, limit: int = 20, area: str | None = None) -> list[BuildStep]:
+        return parse_build_plan(self._get("/v1/build-plan", limit=limit, area=area))
 
     def postcode(self, text: str) -> Postcode:
         normalised = normalise_postcode(text)

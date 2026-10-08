@@ -11,21 +11,31 @@
     setup    create .env (random passwords), conda env and pg_service entry
     up       start PostGIS, the API and GeoServer (docker compose)
     migrate  apply database migrations (alembic upgrade head)
-    pipeline run the Kedro pipeline
+    pipeline run the Kedro pipeline (for -Area, or the default area)
     publish  publish layers to GeoServer and rebuild the QGIS project
     test     lint, type-check and run the test suite
     all      up, migrate, pipeline, publish, test
     down     stop the containers (data volumes are kept)
     status   show container health and the latest pipeline run
 
+.PARAMETER Area
+    ONS local authority district code to plan for, e.g. E07000042 (Mid
+    Devon). Defaults to conf/base/globals.yml. Each area's results are kept
+    side by side, so run this once per area.
+
 .EXAMPLE
     .\scripts\run.ps1 all
+
+.EXAMPLE
+    .\scripts\run.ps1 pipeline -Area E07000042
 #>
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
     [ValidateSet("setup", "up", "migrate", "pipeline", "publish", "test", "all", "down", "status")]
-    [string]$Task = "status"
+    [string]$Task = "status",
+    [ValidatePattern("^[EWS]\d{8}$")]
+    [string]$Area
 )
 $ErrorActionPreference = "Stop"
 $Root = Resolve-Path (Join-Path $PSScriptRoot "..")
@@ -85,7 +95,11 @@ $tasks = @{
         Wait-Healthy postgis; Wait-Healthy api; Wait-Healthy geoserver
     }
     migrate  = { Invoke-Step "alembic upgrade head" { Invoke-InEnv @("alembic", "upgrade", "head") } }
-    pipeline = { Invoke-Step "kedro run" { Invoke-InEnv @("kedro", "run") } }
+    pipeline = {
+        $kedro = @("kedro", "run")
+        if ($Area) { $kedro += @("--params", "area.lad_code=$Area") }
+        Invoke-Step ($kedro -join " ") { Invoke-InEnv $kedro }
+    }
     publish  = {
         Invoke-Step "GeoServer publish" { Invoke-InEnv @("python", "-m", "fibre_planning.geoserver") }
         if ($QgisPython) {
