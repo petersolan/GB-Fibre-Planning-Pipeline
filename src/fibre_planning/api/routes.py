@@ -87,6 +87,38 @@ def priority_road_links(
     return _features(rows, "road_link_id")
 
 
+@router.get("/build-plan", response_model=FeatureCollection)
+def build_plan(
+    conn: Conn,
+    limit: Annotated[int, Query(ge=1, le=1000)] = 50,
+) -> FeatureCollection:
+    """Gap streets in build order, counting the cable needed to reach them.
+
+    Each feature is the street plus its route from the existing gigabit network
+    along the road network (pgRouting); ``connect_m`` is that route's length.
+    """
+    rows = (
+        conn.execute(
+            text("""
+                SELECT road_link_id, build_rank, road_name,
+                       round(people_no_gigabit::numeric, 1)::float AS people_no_gigabit,
+                       round(street_m::numeric, 1)::float AS street_m,
+                       round(connect_m::numeric, 1)::float AS connect_m,
+                       round(total_m::numeric, 1)::float AS total_m,
+                       round(people_per_km_total::numeric, 1)::float AS people_per_km_total,
+                       ST_AsGeoJSON(ST_Transform(geom, 4326), 6) AS geojson
+                FROM fibre.gap_connection
+                ORDER BY build_rank
+                LIMIT :limit
+            """),
+            {"limit": limit},
+        )
+        .mappings()
+        .all()
+    )
+    return _features(rows, "road_link_id")
+
+
 @router.get("/premises", response_model=FeatureCollection)
 def premises_in_bbox(
     conn: Conn,

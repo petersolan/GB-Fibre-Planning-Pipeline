@@ -1,4 +1,4 @@
-r"""Render qgis_project/fibre_planning.qgz to docs/images/qgis_exeter.png (PyQGIS, no GUI).
+r"""Render qgis_project/fibre_planning.qgz to the README images (PyQGIS, no GUI).
 
 "C:\Program Files\QGIS 3.44.13\bin\python-qgis-ltr.bat" qgis_project\render_preview.py
 """
@@ -11,8 +11,38 @@ from qgis.PyQt.QtCore import QSize
 from qgis.PyQt.QtGui import QColor
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "docs" / "images" / "qgis_exeter.png"
-VIEW = QgsRectangle(290500, 91500, 294500, 94500)  # central Exeter, British National Grid
+IMAGES = ROOT / "docs" / "images"
+# (file, extent in British National Grid, layers to leave out)
+VIEWS = [
+    # Central Exeter: premises by coverage and road links by priority
+    ("qgis_exeter.png", QgsRectangle(290500, 91500, 294500, 94500), {"Proposed cable network"}),
+    # Closer in: the proposed cable network from pgRouting
+    (
+        "qgis_routes.png",
+        QgsRectangle(291800, 92200, 293900, 93775),
+        {"Premises: gigabit coverage", "Road links: build priority"},
+    ),
+]
+
+
+def render(project: QgsProject, extent: QgsRectangle, hidden: set[str], out: Path) -> bool:
+    layers = [
+        node.layer()
+        for node in project.layerTreeRoot().findLayers()
+        if node.isVisible() and node.layer() and node.layer().isValid() and node.name() not in hidden
+    ]
+    settings = QgsMapSettings()
+    settings.setLayers(layers)
+    settings.setDestinationCrs(project.crs())
+    settings.setExtent(extent)
+    settings.setOutputSize(QSize(1200, 900))
+    settings.setBackgroundColor(QColor("white"))
+    job = QgsMapRendererParallelJob(settings)
+    job.start()
+    job.waitForFinished()
+    ok = job.renderedImage().save(str(out), "png")
+    print(f"{'Rendered' if ok else 'FAILED'} {len(layers)} layers -> {out}")
+    return ok
 
 
 def main() -> int:
@@ -20,23 +50,8 @@ def main() -> int:
     app.initQgis()
     project = QgsProject.instance()
     project.read(str(ROOT / "qgis_project" / "fibre_planning.qgz"))
-    visible = [
-        node.layer()
-        for node in project.layerTreeRoot().findLayers()
-        if node.isVisible() and node.layer() and node.layer().isValid()
-    ]
-    settings = QgsMapSettings()
-    settings.setLayers(visible)
-    settings.setDestinationCrs(project.crs())
-    settings.setExtent(VIEW)
-    settings.setOutputSize(QSize(1200, 900))
-    settings.setBackgroundColor(QColor("white"))
-    job = QgsMapRendererParallelJob(settings)
-    job.start()
-    job.waitForFinished()
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    ok = job.renderedImage().save(str(OUT), "png")
-    print(f"{'Rendered' if ok else 'FAILED'} {len(visible)} layers -> {OUT}")
+    IMAGES.mkdir(parents=True, exist_ok=True)
+    ok = all(render(project, extent, hidden, IMAGES / name) for name, extent, hidden in VIEWS)
     app.exitQgis()
     return 0 if ok else 1
 

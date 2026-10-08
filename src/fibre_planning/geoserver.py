@@ -26,6 +26,7 @@ STORE = "fibre_postgis"
 STYLES_DIR = Path(__file__).resolve().parents[2] / "geoserver" / "styles"
 # table -> (title, style name or None for GeoServer's default)
 LAYERS = {
+    "build_route": ("Proposed cable network (pgRouting)", "build_route"),
     "road_link_priority": ("Fibre build priority by road link", "road_link_priority"),
     "premises": ("Premises with gigabit coverage", "premises_coverage"),
     "postcode_coverage": ("Postcode coverage", None),

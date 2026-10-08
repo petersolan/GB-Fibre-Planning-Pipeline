@@ -18,8 +18,24 @@ ofcom:
 roads:
   zip_path: data/01_raw/os_open_roads/oproad_essh_gb.zip
   buffer_m: 500          # also read roads just outside the boundary
-  columns: [identifier, function, name1]
+  columns: [identifier, function, name1, startNode, endNode]
 
 analysis:
   max_drop_m: 150        # premises further than this from any road are left unassigned
   min_people_to_rank: 1  # rank only road links serving at least this many people without gigabit
+
+# Routing (pgRouting): connect gap streets to the existing gigabit network
+routing:
+  # A link "has gigabit" when its premises all do; their junctions are where new cable starts
+  min_premises_for_existing: 1
+  # Build cost per metre relative to a local road (digging under busier roads costs more)
+  cost_multiplier:
+    Motorway: 10.0
+    A Road: 3.0
+    B Road: 2.0
+    Minor Road: 1.2
+    Local Road: 1.0
+    Local Access Road: 1.0
+    Restricted Local Access Road: 1.0
+    Secondary Access Road: 1.0
+  default_multiplier: 1.0

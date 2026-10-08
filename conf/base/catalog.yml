@@ -67,6 +67,33 @@ road_priority_gpkg:
   filepath: data/07_model_output/fibre_planning.gpkg
   layer: road_link_priority
 
+# --- routing (pgRouting) --------------------------------------------------
+db_road_network:
+  type: fibre_planning.datasets.postgis.PostGISDataset
+  table: road_network
+
+db_gap_connection:
+  type: fibre_planning.datasets.postgis.PostGISDataset
+  table: gap_connection
+
+db_build_route:
+  type: fibre_planning.datasets.postgis.PostGISDataset
+  table: build_route
+
+build_route_gpkg:
+  type: fibre_planning.datasets.vector_file.VectorFileDataset
+  filepath: data/07_model_output/fibre_planning.gpkg
+  layer: build_route
+
+gap_connection_gpkg:
+  type: fibre_planning.datasets.vector_file.VectorFileDataset
+  filepath: data/07_model_output/fibre_planning.gpkg
+  layer: gap_connection
+
+routing_summary:
+  type: json.JSONDataset
+  filepath: data/08_reporting/routing_summary.json
+
 run_summary:
   type: json.JSONDataset
   filepath: data/08_reporting/run_summary.json

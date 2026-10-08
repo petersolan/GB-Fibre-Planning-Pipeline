@@ -38,6 +38,7 @@ this environment doesn't run programs from the current folder by name).
 | `validate_premises` fails: "% of premises fall outside the boundary" | Wrong `area.lad_code`, or census data from another boundary vintage | Check `conf/base/parameters.yml` and the census outputs |
 | QGIS layers won't open | No `fibre` service entry, or PostGIS is down | `.\scripts\setup_pg_service.ps1`, `.\run.bat up` |
 | GeoServer layers out of date after a new area | Bounding boxes cached | `python -m fibre_planning.geoserver` recalculates them |
+| `CREATE EXTENSION pgrouting` fails | PostGIS container from the plain `postgis/postgis` image | Use `pgrouting/pgrouting:17-3.5-3.8.0` (already in `docker-compose.yml`) and `docker compose up -d postgis`; the data volume carries over |
 | VS Code offers to enable `python.terminal.useEnvFile` | It found `.env` | Decline: it would put the database passwords in every terminal |
 
 ## Changing the database

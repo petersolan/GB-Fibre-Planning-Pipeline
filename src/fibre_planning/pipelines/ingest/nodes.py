@@ -152,11 +152,19 @@ def load_roads(roads: dict[str, Any], boundary: gpd.GeoDataFrame) -> gpd.GeoData
     links = links[links.intersects(area)]
     links["geometry"] = links.geometry.force_2d()
     links = links.rename(
-        columns={"identifier": "road_link_id", "function": "road_function", "name1": "road_name"}
+        columns={
+            "identifier": "road_link_id",
+            "function": "road_function",
+            "name1": "road_name",
+            # Junctions at each end: what makes the links a routable network
+            "startNode": "start_node",
+            "endNode": "end_node",
+        }
     )
     links = links.drop_duplicates("road_link_id")
     log.info("%s road links, %.0f km", f"{len(links):,}", links.length.sum() / 1000)
-    return links[["road_link_id", "road_function", "road_name", "geometry"]].reset_index(drop=True)
+    columns = ["road_link_id", "road_function", "road_name", "start_node", "end_node", "geometry"]
+    return links[columns].reset_index(drop=True)
 
 
 def validate_premises(premises: gpd.GeoDataFrame, boundary: gpd.GeoDataFrame) -> gpd.GeoDataFrame:

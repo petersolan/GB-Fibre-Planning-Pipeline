@@ -20,10 +20,13 @@ def create_pipeline(**kwargs) -> Pipeline:
                 record_run,
                 [
                     "area_summary",
+                    "routing_summary",
                     "db_area_boundary",
                     "db_premises",
                     "db_postcode_coverage",
                     "db_road_link_priority",
+                    "db_gap_connection",
+                    "db_build_route",
                 ],
                 "run_summary",
                 name="record_run",

@@ -12,12 +12,13 @@ flowchart LR
     subgraph kedro["Kedro pipeline (python 3.11, conda env 'fibre')"]
         ING["ingest<br/>read, filter, validate"]
         ANA["analysis<br/>coverage, snap to roads, rank"]
+        ROU["routing<br/>graph + pgRouting"]
         PUB["publish<br/>load, export, record run"]
-        ING --> ANA --> PUB
+        ING --> ANA --> ROU --> PUB
     end
 
     subgraph docker["Docker Compose (127.0.0.1 only)"]
-        PG[("PostGIS<br/>schema 'fibre'<br/>Alembic migrations")]
+        PG[("PostGIS + pgRouting<br/>schema 'fibre'<br/>Alembic migrations")]
         API["FastAPI<br/>read-only role"]
         GS["GeoServer<br/>WMS / WFS"]
         PYPI["pypiserver<br/>(Artifactory stand-in)"]
@@ -38,7 +39,8 @@ flowchart LR
 
 | Component | Code | Role |
 |---|---|---|
-| Pipeline | `src/fibre_planning/pipelines/` | Kedro project: `ingest`, `analysis`, `publish` (17 nodes) |
+| Pipeline | `src/fibre_planning/pipelines/` | Kedro project: `ingest`, `analysis`, `routing`, `publish` (24 nodes) |
+| Routing | `src/fibre_planning/pipelines/routing/` | Road graph, pgRouting Dijkstra from the existing network, build network ([ADR 5](adr/0005-routing-from-the-existing-network.md)) |
 | Custom datasets | `src/fibre_planning/datasets/` | PostGIS table (Alembic-owned schema), GDAL vector files |
 | Monitoring hooks | `src/fibre_planning/hooks.py` | Node timings, row counts, memory: `logs/pipeline.jsonl` and `fibre.pipeline_run` |
 | Database | `migrations/`, `src/fibre_planning/db/` | PostGIS schema, GiST indexes, constraints, read-only role |

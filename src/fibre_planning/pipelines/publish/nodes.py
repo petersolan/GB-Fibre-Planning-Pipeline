@@ -67,12 +67,13 @@ def to_shapefile(links: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     return out
 
 
-def record_run(summary: dict[str, Any], *_published: Any) -> dict[str, Any]:
-    """Write the run summary to fibre.pipeline_run once every table is loaded.
+def record_run(summary: dict[str, Any], routing: dict[str, Any], *_published: Any) -> dict[str, Any]:
+    """Write the run summary (with the routing figures) to fibre.pipeline_run.
 
     The extra arguments are the loaded tables: they only make Kedro run this
     node last.
     """
+    summary = {**summary, "routing": routing}
     engine = create_engine(get_settings().owner_url)
     with engine.begin() as conn:
         conn.execute(insert(PipelineRun).values(lad_code=summary["lad_code"], summary=summary))

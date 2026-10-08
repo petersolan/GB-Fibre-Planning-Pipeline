@@ -49,6 +49,15 @@ def test_road_links_ranked_only(client):
     assert -3.6 < lon < -3.4 and 50.6 < lat < 50.8  # returned in WGS84
 
 
+def test_build_plan(client):
+    body = client.get("/v1/build-plan").json()
+    (feature,) = body["features"]
+    assert feature["id"] == "LINK-B"
+    assert feature["properties"]["build_rank"] == 1
+    assert feature["properties"]["connect_m"] == 100
+    assert feature["geometry"]["type"] == "MultiLineString"
+
+
 def test_premises_bbox(client):
     body = client.get("/v1/premises", params={"bbox": TESTVILLE_BBOX}).json()
     assert body["count"] == 4

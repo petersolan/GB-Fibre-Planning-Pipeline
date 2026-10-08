@@ -3,7 +3,8 @@
 # published on 127.0.0.1 only, so nothing is reachable from the network.
 services:
   postgis:
-    image: postgis/postgis:17-3.5
+    # PostGIS plus pgRouting (same PostgreSQL 17 / PostGIS 3.5 base, so the data volume carries over)
+    image: pgrouting/pgrouting:17-3.5-3.8.0
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}

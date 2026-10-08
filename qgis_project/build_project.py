@@ -33,6 +33,7 @@ GEOSERVER_WMS = "http://127.0.0.1:8080/geoserver/fibre/wms"
 POSTGIS_LAYERS = [
     ("area_boundary", "MultiPolygon", "Planning area", "area_boundary"),
     ("road_link_priority", "LineString", "Road links: build priority", "road_link_priority"),
+    ("build_route", "LineString", "Proposed cable network", "build_route"),
     ("premises", "Point", "Premises: gigabit coverage", "premises_coverage"),
     ("postcode_coverage", "Point", "Postcodes", None),
 ]
@@ -65,6 +66,7 @@ def main() -> int:
     keys = {
         "area_boundary": "lad_code",
         "road_link_priority": "road_link_id",
+        "build_route": "road_link_id",
         "premises": "uprn",
         "postcode_coverage": "postcode",
     }

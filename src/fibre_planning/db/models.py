@@ -8,7 +8,7 @@ reads them. All geometries are British National Grid (EPSG:27700).
 from datetime import datetime
 
 from geoalchemy2 import Geometry
-from sqlalchemy import BigInteger, DateTime, Float, Integer, MetaData, String, func
+from sqlalchemy import BigInteger, Boolean, DateTime, Float, Integer, MetaData, String, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -86,3 +86,50 @@ class PipelineRun(Base):
     run_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     lad_code: Mapped[str] = mapped_column(String(9))
     summary = mapped_column(JSONB)
+
+
+class RoadNetwork(Base):
+    """Routable graph for pgRouting: one edge per road link, junctions as integer vertices."""
+
+    __tablename__ = "road_network"
+
+    edge_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    road_link_id: Mapped[str] = mapped_column(String(38), unique=True)
+    road_function: Mapped[str | None] = mapped_column(String(40))
+    source: Mapped[int] = mapped_column(Integer, index=True)
+    target: Mapped[int] = mapped_column(Integer, index=True)
+    length_m: Mapped[float] = mapped_column(Float)
+    cost: Mapped[float] = mapped_column(Float)  # length weighted by road type
+    has_gigabit: Mapped[bool] = mapped_column(Boolean)  # existing network: start of new cable
+    is_gap: Mapped[bool] = mapped_column(Boolean)  # serves people without gigabit
+    people_no_gigabit: Mapped[float] = mapped_column(Float)
+    geom = mapped_column(Geometry("LINESTRING", srid=SRID, spatial_index=False), nullable=False)
+
+
+class GapConnection(Base):
+    """A gap street with its connecting route from the existing gigabit network."""
+
+    __tablename__ = "gap_connection"
+
+    road_link_id: Mapped[str] = mapped_column(String(38), primary_key=True)
+    road_name: Mapped[str | None] = mapped_column(String(100))
+    people_no_gigabit: Mapped[float] = mapped_column(Float)
+    street_m: Mapped[float] = mapped_column(Float)
+    connect_m: Mapped[float] = mapped_column(Float)
+    total_m: Mapped[float] = mapped_column(Float)
+    people_per_km_total: Mapped[float] = mapped_column(Float)
+    build_rank: Mapped[int] = mapped_column(Integer, unique=True)
+    geom = mapped_column(Geometry("MULTILINESTRING", srid=SRID, spatial_index=False), nullable=False)
+
+
+class BuildRoute(Base):
+    """A road link in the proposed cable network ('connection' route or 'gap' street)."""
+
+    __tablename__ = "build_route"
+
+    road_link_id: Mapped[str] = mapped_column(String(38), primary_key=True)
+    role: Mapped[str] = mapped_column(String(10))
+    length_m: Mapped[float] = mapped_column(Float)
+    gap_links_served: Mapped[int] = mapped_column(Integer)
+    people_served: Mapped[float] = mapped_column(Float)
+    geom = mapped_column(Geometry("LINESTRING", srid=SRID, spatial_index=False), nullable=False)

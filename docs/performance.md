@@ -38,3 +38,32 @@ here) before anything happened. The first full pipeline run took 11 minutes;
 connecting to `127.0.0.1` brought it to 30 seconds. Timing a connection to
 each host showed it: 0.1 s for 127.0.0.1, still hanging after 200 s for
 localhost.
+
+## Route geometry for each gap street (routing pipeline)
+
+The pgRouting Dijkstra run itself takes about 0.02 s for Exeter's 6,402 road
+links. Assembling each gap street's geometry (the street plus its route edges)
+first took **62 s**, because the join was written as
+
+```sql
+JOIN fibre.road_network n
+  ON n.edge_id = c.edge_id
+  OR n.edge_id IN (SELECT route_edge FROM gap_route_edges WHERE gap_edge = c.edge_id)
+```
+
+An `OR` across two conditions, one of them a correlated subquery, can't use
+the primary key index, so PostgreSQL evaluated the subquery for every pair of
+gap street and road link (722 × 6,402). Rewriting it as one list of
+(gap, edge) pairs joined on the primary key took it to **0.01 s**, with
+identical results:
+
+```sql
+FROM (SELECT gap_edge, route_edge AS edge FROM gap_route_edges
+      UNION ALL
+      SELECT edge_id, edge_id FROM gap_choice) u
+JOIN fibre.road_network n ON n.edge_id = u.edge
+```
+
+The `route_gaps` node went from 68 s to 0.3 s, and the whole pipeline from
+91 s to 20 s. Timing each statement separately found it at once; the hook
+timings in `logs/pipeline.jsonl` showed which node to look at.
