@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from qgis.core import QgsApplication, QgsMapRendererParallelJob, QgsMapSettings, QgsProject, QgsRectangle
+from PIL import Image
 from qgis.PyQt.QtCore import QSize
 from qgis.PyQt.QtGui import QColor
 
@@ -41,6 +42,13 @@ def render(project: QgsProject, extent: QgsRectangle, hidden: set[str], out: Pat
     job.start()
     job.waitForFinished()
     ok = job.renderedImage().save(str(out), "png")
+    if ok:
+        # 256-colour median-cut palette (Pillow ships with QGIS): about 3x smaller with no
+        # visible change, which keeps README images under the 1 MB pre-commit limit
+        palette = (
+            Image.open(out).convert("RGB").quantize(256, Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
+        )
+        palette.save(out, optimize=True)
     print(f"{'Rendered' if ok else 'FAILED'} {len(layers)} layers -> {out}")
     return ok
 
