@@ -189,7 +189,9 @@ conf/                Kedro catalog, parameters, logging
 geoserver/styles/    SLD styles (also used by QGIS)
 qgis_project/        PyQGIS project builder and preview renderer
 qgis_plugin/         QGIS plugin and its headless tests
-scripts/             PowerShell: task runner, packaging, pg_service setup
+scripts/             PowerShell: task runner, packaging, pg_service setup;
+                     export_site.py: GeoJSON for the live build plan
+site/                the live build plan (MapLibre), deployed to GitHub Pages
 tests/               unit, API and migration tests
 docs/                architecture, ADRs, runbook, performance notes
 ```

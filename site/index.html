@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fibre Build Plan</title>
+<meta name="description" content="Ranked fibre build plans for Exeter and Mid Devon: which streets lack gigabit broadband and the cable needed to reach them.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: full-screen map with one floating panel (area switch, build slider, totals, credits). */
+:root{--bg:#f3f6f6;--surface:#fff;--ink:#0f1f26;--ink2:#41545c;--muted:#6f8189;--line:#dbe3e5;--accent:#0b6e64;
+ --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0d1417;--surface:#141d21;--ink:#e8f0f1;--ink2:#b3c3c7;
+ --muted:#7f9298;--line:#25333a;--accent:#4fc1b3;color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:15px/1.5 var(--sans)}
+#map{position:absolute;inset:0}
+.panel{position:absolute;top:12px;left:12px;width:min(350px,calc(100% - 24px));max-height:calc(100% - 24px);overflow:auto;
+ background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 16px 12px;box-shadow:0 4px 18px rgba(0,0,0,.12)}
+h1{font-size:19px;line-height:1.25;margin:0 0 6px}
+.lede{margin:0;color:var(--ink2);font-size:14px}
+.eyebrow{font:500 11.5px/1 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:14px 0 6px}
+.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{flex:1;border:0;background:none;color:var(--ink2);font:500 13.5px var(--sans);padding:7px 4px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent);color:#fff}
+input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 0}
+.n{font:600 15px var(--mono)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px}
+.stats div{background:var(--bg);border-radius:6px;padding:6px 8px}
+.stats b{display:block;font:600 15px/1.2 var(--mono)} .stats span{font-size:11.5px;color:var(--muted)}
+.key{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:var(--ink2);margin-top:10px}
+.key span{display:flex;align-items:center;gap:6px} .key i{width:18px;height:4px;border-radius:2px;display:inline-block}
+.note{font-size:12.5px;color:var(--ink2);margin:10px 0 0}
+.credits{font-size:11.5px;color:var(--muted);margin:10px 0 0;line-height:1.45}
+a{color:var(--accent)}
+.toggle{display:none}
+@media (max-width:600px){.panel{top:auto;bottom:12px;max-height:52%}
+ .panel.collapsed>:not(h1):not(.toggle){display:none}
+ .toggle{display:block;position:absolute;top:12px;right:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink2);border-radius:6px;font:500 12px var(--sans);padding:4px 8px}}
+.maplibregl-popup-content{font:13px/1.45 var(--sans);color:#0f1f26}
+.maplibregl-popup-content b{font-family:var(--mono)} .maplibregl-popup-content h3{margin:0 0 4px;font-size:14px}
+</style>
+</head>
+<body>
+<div id="map" role="region" aria-label="Map of the proposed fibre build"></div>
+<aside class="panel" id="panel">
+  <button class="toggle" id="toggle" aria-expanded="true">Hide</button>
+  <h1>Where to build fibre first</h1>
+  <p class="lede">Streets whose premises lack gigabit broadband, ranked by people reached per km of new cable,
+    including the route from the existing gigabit network. Click a street for its numbers.</p>
+  <div class="eyebrow">Area</div>
+  <div class="seg" role="group" aria-label="Area" id="areas"></div>
+  <div class="eyebrow"><label for="rank">Build the top <span class="n" id="nlabel"></span> streets</label></div>
+  <input type="range" id="rank" min="1" value="20">
+  <div class="stats">
+    <div><b id="people"></b><span>people without gigabit reached</span></div>
+    <div><b id="km"></b><span>new cable</span></div>
+    <div><b id="cost"></b><span>indicative civil works</span></div>
+  </div>
+  <div class="key">
+    <span><i style="background:#d7301f"></i>Along gap street</span>
+    <span><i style="background:#2c6fbb"></i>Connecting route</span>
+    <span><i style="background:#9aa7ad"></i>Later in the plan</span>
+  </div>
+  <p class="note">Cost is £100 per metre of trenching, the indicative figure for where no duct exists: for comparing
+    options, not a budget. Shared routes are counted once.</p>
+  <p class="credits">Pipeline (Kedro, PostGIS, pgRouting, FastAPI, GeoServer, QGIS):
+    <a href="https://github.com/petersolan/GB-Fibre-Planning-Pipeline">repository</a>.<br>
+    Contains Ofcom data, licensed under the
+    <a href="https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/">Open Government Licence v3.0</a>.
+    Contains OS data © Crown copyright and database right 2026. Source: Office for National Statistics, licensed under
+    the Open Government Licence v3.0. Contains Royal Mail data © Royal Mail copyright and database right 2026.</p>
+</aside>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.js"></script>
+<script>
+const fmtInt = v => Math.round(v).toLocaleString("en-GB");
+const fmtCost = v => v >= 1e6 ? `£${(v / 1e6).toFixed(1)} m` : `£${fmtInt(v / 1e3)}k`;
+let plan, lad = "E07000041";
+const slider = document.getElementById("rank");
+
+const map = new maplibregl.Map({
+  container: "map",
+  style: "https://tiles.openfreemap.org/styles/positron",
+  center: [-3.52, 50.72], zoom: 12.3,
+});
+map.addControl(new maplibregl.NavigationControl({showCompass: false}), "top-right");
+map.addControl(new maplibregl.ScaleControl(), "bottom-right");
+const pad = () => innerWidth > 600 ? {top: 30, bottom: 30, left: 390, right: 30} : 20;
+
+const inPlan = () => ["all", ["==", ["get", "lad"], lad], ["<=", ["get", "first_rank"], Number(slider.value)]];
+const later = () => ["all", ["==", ["get", "lad"], lad], [">", ["get", "first_rank"], Number(slider.value)]];
+
+map.on("load", async () => {
+  plan = await (await fetch("data/plan.json")).json();
+  const before = map.getStyle().layers.find(l => l.type === "symbol")?.id;
+  map.addSource("cable", {type: "geojson", data: "data/cable.geojson",
+    attribution: "Build plan: Ofcom, OS Open Roads, ONS (OGL v3)"});
+  map.addSource("gaps", {type: "geojson", data: "data/gap_streets.geojson"});
+  map.addLayer({id: "later", type: "line", source: "cable", filter: later(),
+    paint: {"line-color": "#8a979d", "line-width": 1.5, "line-opacity": 0.75}}, before);
+  map.addLayer({id: "built", type: "line", source: "cable", filter: inPlan(), layout: {"line-cap": "round"},
+    paint: {"line-color": ["match", ["get", "role"], "gap", "#d7301f", "#2c6fbb"],
+            "line-width": ["interpolate", ["linear"], ["zoom"], 10, 2, 15, 5]}}, before);
+  // invisible wide lines to make streets easy to click
+  map.addLayer({id: "gap-hit", type: "line", source: "gaps", filter: ["==", ["get", "lad"], lad],
+    paint: {"line-color": "#000", "line-width": 10, "line-opacity": 0}});
+  setArea(lad, false);
+});
+
+map.on("click", "gap-hit", (e) => {
+  const p = e.features.sort((a, b) => a.properties.build_rank - b.properties.build_rank)[0].properties;
+  new maplibregl.Popup({maxWidth: "280px"}).setLngLat(e.lngLat).setHTML(
+    `<h3>${p.road_name || "Unnamed road"}</h3>Rank <b>${p.build_rank}</b> of ${plan[lad].streets}<br>` +
+    `People without gigabit <b>${fmtInt(p.people_no_gigabit)}</b> (${fmtInt(p.premises_no_gigabit)} premises)<br>` +
+    `Street <b>${fmtInt(p.street_m)} m</b> + connection <b>${fmtInt(p.connect_m)} m</b><br>` +
+    `Indicative cost <b>${fmtCost(p.est_cost_gbp)}</b>, <b>£${fmtInt(p.cost_per_premises_gbp)}</b> per premises`
+  ).addTo(map);
+});
+map.on("mouseenter", "gap-hit", () => map.getCanvas().style.cursor = "pointer");
+map.on("mouseleave", "gap-hit", () => map.getCanvas().style.cursor = "");
+
+function update() {
+  const a = plan[lad], i = Number(slider.value) - 1;
+  document.getElementById("nlabel").textContent = fmtInt(i + 1);
+  document.getElementById("people").textContent = fmtInt(a.people[i]);
+  document.getElementById("km").textContent = `${a.km[i].toFixed(1)} km`;
+  document.getElementById("cost").textContent = fmtCost(a.cost[i]);
+  map.setFilter("built", inPlan());
+  map.setFilter("later", later());
+}
+
+function setArea(code, fly = true) {
+  lad = code;
+  for (const b of document.querySelectorAll("#areas button")) b.setAttribute("aria-pressed", b.dataset.lad === code);
+  slider.max = plan[code].streets;
+  slider.value = Math.min(Number(slider.value), plan[code].streets);
+  map.setFilter("gap-hit", ["==", ["get", "lad"], lad]);
+  const [w, s, e, n] = plan[code].bounds;
+  map.fitBounds([[w, s], [e, n]], {padding: pad(), duration: fly ? 1200 : 0});
+  update();
+}
+
+document.getElementById("areas").innerHTML =
+  [["E07000041", "Exeter (city)"], ["E07000042", "Mid Devon (rural)"]]
+    .map(([c, n]) => `<button data-lad="${c}">${n}</button>`).join("");
+for (const b of document.querySelectorAll("#areas button")) b.onclick = () => plan && setArea(b.dataset.lad);
+slider.oninput = () => plan && update();
+
+const panel = document.getElementById("panel"), toggle = document.getElementById("toggle");
+toggle.onclick = () => {
+  const collapsed = panel.classList.toggle("collapsed");
+  toggle.textContent = collapsed ? "About" : "Hide";
+  toggle.setAttribute("aria-expanded", !collapsed);
+};
+</script>
+</body>
+</html>
